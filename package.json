@@ -1,0 +1,27 @@
+{
+  "name": "adore",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Your Style Intelligence — AI-powered personal stylist and wardrobe platform",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:mobile": "pnpm --filter @adore/mobile dev",
+    "dev:api": "pnpm --filter @adore/api dev",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @adore/api build",
+    "test": "pnpm -r test",
+    "test:api": "pnpm --filter @adore/api test",
+    "test:mobile": "pnpm --filter @adore/mobile test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > packages/shared/src/database.types.ts",
+    "clean": "pnpm -r clean"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
