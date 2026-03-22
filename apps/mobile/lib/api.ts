@@ -2,9 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 import type {
   WardrobeItem,
   ItemAttributes,
+  Outfit,
+  OutfitItem,
+  WeatherContext,
   PaginatedResponse,
   ApiResponse,
   ApiError,
+  OccasionType,
+  MoodTag,
+  ItemCategory,
+  Pattern,
+  Material,
+  Season,
+  ItemCondition,
 } from '@adore/shared';
 
 // ── Supabase client (for auth only in mobile) ──────────────
@@ -165,4 +175,127 @@ export async function scanItem(
     }
   );
   return result.data;
+}
+
+// ── Outfits API ─────────────────────────────────────────────
+
+/** Outfit with joined items from the API */
+export interface OutfitWithItems extends Outfit {
+  outfit_items: Array<
+    OutfitItem & {
+      wardrobe_item: Pick<
+        WardrobeItem,
+        'id' | 'name' | 'category' | 'colors' | 'image_url' | 'image_url_clean'
+      > | null;
+    }
+  >;
+}
+
+export interface ListOutfitsParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export async function listOutfits(
+  params: ListOutfitsParams = {}
+): Promise<PaginatedResponse<OutfitWithItems>> {
+  const searchParams = new URLSearchParams();
+  if (params.cursor) searchParams.set('cursor', params.cursor);
+  if (params.limit) searchParams.set('limit', String(params.limit));
+
+  const qs = searchParams.toString();
+  return apiFetch<PaginatedResponse<OutfitWithItems>>(
+    `/outfits${qs ? `?${qs}` : ''}`
+  );
+}
+
+export async function getOutfit(
+  id: string
+): Promise<ApiResponse<OutfitWithItems>> {
+  return apiFetch<ApiResponse<OutfitWithItems>>(`/outfits/${id}`);
+}
+
+export interface CreateOutfitPayload {
+  photo_url?: string | null;
+  occasion?: OccasionType | null;
+  mood_tag?: MoodTag | null;
+  worn_date?: string | null;
+  notes?: string | null;
+  happiness_score?: number | null;
+  weather_context?: WeatherContext | null;
+  item_ids?: string[];
+  new_items?: Array<{
+    name: string;
+    category: ItemCategory;
+    subcategory?: string | null;
+    colors?: string[];
+    pattern?: Pattern;
+    material?: Material | null;
+    brand?: string | null;
+    formality_level?: number;
+    seasons?: Season[];
+    condition?: ItemCondition;
+    image_url?: string | null;
+    image_url_clean?: string | null;
+  }>;
+}
+
+export async function createOutfit(
+  data: CreateOutfitPayload
+): Promise<ApiResponse<OutfitWithItems>> {
+  return apiFetch<ApiResponse<OutfitWithItems>>('/outfits', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateOutfit(
+  id: string,
+  updates: Record<string, unknown>
+): Promise<ApiResponse<OutfitWithItems>> {
+  return apiFetch<ApiResponse<OutfitWithItems>>(`/outfits/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+/** Decompose result for a single detected item */
+export interface DecomposedItem {
+  detected_item: ItemAttributes & { description: string };
+  match: {
+    wardrobe_item_id: string;
+    confidence: number;
+    wardrobe_item: Pick<
+      WardrobeItem,
+      'id' | 'name' | 'category' | 'colors' | 'image_url' | 'image_url_clean'
+    > | null;
+  } | null;
+}
+
+export async function decomposeOutfit(
+  imageUrl: string
+): Promise<DecomposedItem[]> {
+  const result = await apiFetch<ApiResponse<DecomposedItem[]>>(
+    '/outfits/decompose',
+    {
+      method: 'POST',
+      body: JSON.stringify({ image_url: imageUrl }),
+    }
+  );
+  return result.data;
+}
+
+export async function getWeatherForLocation(
+  lat: number,
+  lon: number
+): Promise<WeatherContext | null> {
+  try {
+    const result = await apiFetch<ApiResponse<WeatherContext>>(
+      `/outfits/weather?lat=${lat}&lon=${lon}`
+    );
+    return result.data;
+  } catch {
+    // Weather is optional — never block on it
+    return null;
+  }
 }

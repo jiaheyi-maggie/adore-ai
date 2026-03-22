@@ -76,6 +76,14 @@ export default function RootLayout() {
             title: 'Add Item',
           }}
         />
+        {/* Hide log-outfit from tabs — it's a modal screen accessed via journal */}
+        <Tabs.Screen
+          name="log-outfit"
+          options={{
+            href: null,
+            title: 'Log Outfit',
+          }}
+        />
       </Tabs>
     </QueryClientProvider>
   );
