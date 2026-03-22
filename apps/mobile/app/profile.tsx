@@ -1,8 +1,21 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import type { MarketplaceListing, PaginatedResponse } from '@adore/shared';
+import { listListings } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+
+  // Fetch active listings to show count badge
+  const { data: activeListingsData } = useQuery<PaginatedResponse<MarketplaceListing>>({
+    queryKey: ['marketplace-listings', 'active', 'badge'],
+    queryFn: () => listListings({ status: 'active', limit: 100 }),
+  });
+  const activeCount = activeListingsData?.data.length ?? 0;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -16,6 +29,12 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.menuSection}>
+        <MenuItem
+          icon="pricetag-outline"
+          label="My Listings"
+          badge={activeCount > 0 ? `${activeCount} active` : undefined}
+          onPress={() => router.push('/my-listings')}
+        />
         <MenuItem icon="color-palette-outline" label="Color Analysis" badge="Not set" />
         <MenuItem icon="analytics-outline" label="Style DNA" badge="Not set" />
         <MenuItem icon="wallet-outline" label="Budget" badge="Not set" />
@@ -27,9 +46,19 @@ export default function ProfileScreen() {
   );
 }
 
-function MenuItem({ icon, label, badge }: { icon: string; label: string; badge?: string }) {
+function MenuItem({
+  icon,
+  label,
+  badge,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  badge?: string;
+  onPress?: () => void;
+}) {
   return (
-    <Pressable style={styles.menuItem}>
+    <Pressable style={styles.menuItem} onPress={onPress}>
       <Ionicons name={icon as any} size={22} color={colors.secondary} />
       <Text style={styles.menuLabel}>{label}</Text>
       {badge && <Text style={styles.menuBadge}>{badge}</Text>}

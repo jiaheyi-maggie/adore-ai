@@ -7,6 +7,9 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  ActionSheetIOS,
+  Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +22,37 @@ import { colors, fonts } from '../lib/theme';
 export default function WardrobeScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleLongPress = useCallback(
+    (item: WardrobeItem) => {
+      if (item.status === 'listed' || item.status === 'sold') return;
+
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: ['Cancel', 'Sell this item'],
+            cancelButtonIndex: 0,
+            title: item.name,
+          },
+          (buttonIndex) => {
+            if (buttonIndex === 1) {
+              router.push({ pathname: '/sell-item', params: { itemId: item.id } });
+            }
+          }
+        );
+      } else {
+        Alert.alert(item.name, undefined, [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sell this item',
+            onPress: () =>
+              router.push({ pathname: '/sell-item', params: { itemId: item.id } }),
+          },
+        ]);
+      }
+    },
+    [router]
+  );
 
   const {
     data,
@@ -81,7 +115,12 @@ export default function WardrobeScreen() {
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}
-        renderItem={({ item }) => <ItemCard item={item} />}
+        renderItem={({ item }) => (
+          <ItemCard
+            item={item}
+            onLongPress={() => handleLongPress(item)}
+          />
+        )}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.3}
         refreshControl={

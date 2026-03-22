@@ -15,6 +15,12 @@ import type {
   Material,
   Season,
   ItemCondition,
+  Conversation,
+  Message,
+  MarketplaceListing,
+  PriceSuggestion,
+  ListingStatus,
+  ListingPlatform,
 } from '@adore/shared';
 
 // ── Supabase client (for auth only in mobile) ──────────────
@@ -298,4 +304,158 @@ export async function getWeatherForLocation(
     // Weather is optional — never block on it
     return null;
   }
+}
+
+// ── Marketplace API ─────────────────────────────────────────
+
+export interface ListListingsParams {
+  status?: ListingStatus;
+  cursor?: string;
+  limit?: number;
+}
+
+export async function listListings(
+  params: ListListingsParams = {}
+): Promise<PaginatedResponse<MarketplaceListing>> {
+  const searchParams = new URLSearchParams();
+  if (params.status) searchParams.set('status', params.status);
+  if (params.cursor) searchParams.set('cursor', params.cursor);
+  if (params.limit) searchParams.set('limit', String(params.limit));
+
+  const qs = searchParams.toString();
+  return apiFetch<PaginatedResponse<MarketplaceListing>>(
+    `/marketplace/listings${qs ? `?${qs}` : ''}`
+  );
+}
+
+export async function getListing(
+  id: string
+): Promise<ApiResponse<MarketplaceListing>> {
+  return apiFetch<ApiResponse<MarketplaceListing>>(`/marketplace/listings/${id}`);
+}
+
+export async function createListing(
+  listing: Record<string, unknown>
+): Promise<ApiResponse<MarketplaceListing>> {
+  return apiFetch<ApiResponse<MarketplaceListing>>('/marketplace/listings', {
+    method: 'POST',
+    body: JSON.stringify(listing),
+  });
+}
+
+export async function updateListing(
+  id: string,
+  updates: Record<string, unknown>
+): Promise<ApiResponse<MarketplaceListing>> {
+  return apiFetch<ApiResponse<MarketplaceListing>>(`/marketplace/listings/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function markListingSold(
+  id: string,
+  soldPrice: number
+): Promise<ApiResponse<MarketplaceListing>> {
+  return apiFetch<ApiResponse<MarketplaceListing>>(
+    `/marketplace/listings/${id}/mark-sold`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ sold_price: soldPrice }),
+    }
+  );
+}
+
+export async function cancelListing(
+  id: string
+): Promise<ApiResponse<MarketplaceListing>> {
+  return apiFetch<ApiResponse<MarketplaceListing>>(`/marketplace/listings/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function suggestPrice(
+  wardrobeItemId: string
+): Promise<ApiResponse<PriceSuggestion>> {
+  return apiFetch<ApiResponse<PriceSuggestion>>('/marketplace/price-suggest', {
+    method: 'POST',
+    body: JSON.stringify({ wardrobe_item_id: wardrobeItemId }),
+  });
+}
+
+export interface GeneratedListing {
+  title: string;
+  description: string;
+  platform: string;
+}
+
+export async function generateListing(
+  wardrobeItemId: string,
+  platform: ListingPlatform,
+  notes?: string
+): Promise<ApiResponse<GeneratedListing>> {
+  return apiFetch<ApiResponse<GeneratedListing>>('/marketplace/generate-listing', {
+    method: 'POST',
+    body: JSON.stringify({
+      wardrobe_item_id: wardrobeItemId,
+      platform,
+      notes,
+    }),
+  });
+}
+
+// ── Stylist Chat API ────────────────────────────────────────
+
+export interface ChatResponse {
+  message: Message;
+  conversation: Conversation;
+}
+
+export async function sendMessage(
+  message: string,
+  conversationId?: string
+): Promise<ApiResponse<ChatResponse>> {
+  return apiFetch<ApiResponse<ChatResponse>>('/stylist/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message,
+      conversation_id: conversationId,
+    }),
+  });
+}
+
+export async function listConversations(
+  params: { cursor?: string; limit?: number } = {}
+): Promise<PaginatedResponse<Conversation>> {
+  const searchParams = new URLSearchParams();
+  if (params.cursor) searchParams.set('cursor', params.cursor);
+  if (params.limit) searchParams.set('limit', String(params.limit));
+
+  const qs = searchParams.toString();
+  return apiFetch<PaginatedResponse<Conversation>>(
+    `/stylist/conversations${qs ? `?${qs}` : ''}`
+  );
+}
+
+export async function getMessages(
+  conversationId: string,
+  params: { cursor?: string; limit?: number } = {}
+): Promise<PaginatedResponse<Message>> {
+  const searchParams = new URLSearchParams();
+  if (params.cursor) searchParams.set('cursor', params.cursor);
+  if (params.limit) searchParams.set('limit', String(params.limit));
+
+  const qs = searchParams.toString();
+  return apiFetch<PaginatedResponse<Message>>(
+    `/stylist/conversations/${conversationId}/messages${qs ? `?${qs}` : ''}`
+  );
+}
+
+export async function deleteConversation(
+  id: string
+): Promise<ApiResponse<{ deleted: boolean }>> {
+  return apiFetch<ApiResponse<{ deleted: boolean }>>(
+    `/stylist/conversations/${id}`,
+    { method: 'DELETE' }
+  );
 }

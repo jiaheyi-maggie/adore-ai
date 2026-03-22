@@ -648,3 +648,102 @@ export interface WardrobeAnalytics {
   versatility_bottom_10: WardrobeItem[];
   seasonal_readiness: Record<Season, number>; // 0-100 score
 }
+
+// ── Marketplace / One-Tap Sell ──────────────────────────────
+
+export const LISTING_STATUSES = [
+  'draft',
+  'active',
+  'pending_sale',
+  'sold',
+  'cancelled',
+  'expired',
+] as const;
+export type ListingStatus = (typeof LISTING_STATUSES)[number];
+
+export const LISTING_PLATFORMS = [
+  'depop',
+  'poshmark',
+  'ebay',
+  'mercari',
+  'other',
+] as const;
+export type ListingPlatform = (typeof LISTING_PLATFORMS)[number];
+
+export interface MarketplaceListing {
+  id: string;
+  user_id: string;
+  wardrobe_item_id: string;
+  platform: ListingPlatform;
+  status: ListingStatus;
+  title: string;
+  description: string;
+  suggested_price: number | null;
+  listed_price: number | null;
+  sold_price: number | null;
+  price_suggestion: PriceSuggestion | null;
+  external_listing_id: string | null;
+  external_listing_url: string | null;
+  listed_at: ISOTimestamp | null;
+  sold_at: ISOTimestamp | null;
+  cancelled_at: ISOTimestamp | null;
+  expires_at: ISOTimestamp | null;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}
+
+export interface PriceSuggestion {
+  suggested_price: number;
+  confidence: number; // 0-1
+  factors: PriceFactor[];
+  anchor_price: number | null; // original purchase price if known
+}
+
+export interface PriceFactor {
+  name: string; // e.g. "condition_depreciation", "age_decay", "seasonal_boost"
+  description: string;
+  impact: number; // multiplier or absolute adjustment
+  applied: boolean; // whether this factor had enough data
+}
+
+export type SellReason =
+  | 'no_longer_fits'
+  | 'style_change'
+  | 'rarely_worn'
+  | 'duplicate'
+  | 'declutter'
+  | 'upgrade'
+  | 'other';
+
+export interface SellSuggestion {
+  item_id: string;
+  reason: SellReason;
+  suggested_price: number;
+  confidence: number;
+  reasoning: string;
+}
+
+export type CreateMarketplaceListing = Omit<
+  MarketplaceListing,
+  | 'id'
+  | 'user_id'
+  | 'sold_price'
+  | 'sold_at'
+  | 'cancelled_at'
+  | 'expires_at'
+  | 'created_at'
+  | 'updated_at'
+>;
+
+export interface MarkListingSold {
+  sold_price: number;
+}
+
+export interface MarketplaceAnalytics {
+  total_listed: number;
+  total_sold: number;
+  total_revenue: number;
+  avg_days_to_sell: number;
+  active_listings: number;
+  platform_breakdown: Record<ListingPlatform, { listed: number; sold: number; revenue: number }>;
+}

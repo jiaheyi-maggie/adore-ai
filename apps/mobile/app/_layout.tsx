@@ -135,6 +135,22 @@ export default function RootLayout() {
               title: 'Log Outfit',
             }}
           />
+          {/* Hide sell-item from tabs — accessed via wardrobe long-press */}
+          <Tabs.Screen
+            name="sell-item"
+            options={{
+              href: null,
+              title: 'Sell Item',
+            }}
+          />
+          {/* Hide my-listings from tabs — accessed via profile */}
+          <Tabs.Screen
+            name="my-listings"
+            options={{
+              href: null,
+              title: 'My Listings',
+            }}
+          />
         </Tabs>
       </View>
     </QueryClientProvider>

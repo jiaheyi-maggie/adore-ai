@@ -10,9 +10,10 @@ const CARD_WIDTH = (SCREEN_WIDTH - CARD_PADDING * 2 - CARD_GAP) / 2;
 interface ItemCardProps {
   item: WardrobeItem;
   onPress?: () => void;
+  onLongPress?: () => void;
 }
 
-export default function ItemCard({ item, onPress }: ItemCardProps) {
+export default function ItemCard({ item, onPress, onLongPress }: ItemCardProps) {
   const imageUrl = item.image_url_clean ?? item.image_url;
   const dotColor = categoryColors[item.category] ?? colors.textMuted;
 
@@ -23,7 +24,7 @@ export default function ItemCard({ item, onPress }: ItemCardProps) {
       : null;
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={styles.card} onPress={onPress} onLongPress={onLongPress} delayLongPress={400}>
       <View style={styles.imageContainer}>
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />

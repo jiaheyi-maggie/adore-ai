@@ -7,6 +7,8 @@ import uploadRoutes from './routes/upload';
 import bgRemovalRoutes from './routes/background-removal';
 import scanRoutes from './routes/scan';
 import outfitRoutes from './routes/outfits';
+import stylistRoutes from './routes/stylist';
+import marketplaceRoutes from './routes/marketplace';
 
 const app = new Hono();
 
@@ -40,6 +42,8 @@ app.route('/wardrobe', uploadRoutes);
 app.route('/wardrobe', bgRemovalRoutes);
 app.route('/wardrobe', scanRoutes);
 app.route('/outfits', outfitRoutes);
+app.route('/stylist', stylistRoutes);
+app.route('/marketplace', marketplaceRoutes);
 
 const port = Number(process.env.PORT) || 3000;
 
