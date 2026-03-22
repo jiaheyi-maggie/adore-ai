@@ -21,6 +21,10 @@ import type {
   PriceSuggestion,
   ListingStatus,
   ListingPlatform,
+  WishlistItem,
+  WishlistPriority,
+  HappinessScore,
+  BudgetPeriod,
 } from '@adore/shared';
 
 // ── Supabase client (for auth only in mobile) ──────────────
@@ -457,5 +461,154 @@ export async function deleteConversation(
   return apiFetch<ApiResponse<{ deleted: boolean }>>(
     `/stylist/conversations/${id}`,
     { method: 'DELETE' }
+  );
+}
+
+// ── Wishlist API ──────────────────────────────────────────────
+
+export interface ListWishlistItemsParams {
+  status?: 'active' | 'purchased' | 'dismissed';
+  priority?: WishlistPriority;
+  sort?: 'happiness' | 'priority' | 'created_at' | 'price';
+  cursor?: string;
+  limit?: number;
+}
+
+export async function listWishlistItems(
+  params: ListWishlistItemsParams = {}
+): Promise<PaginatedResponse<WishlistItem>> {
+  const searchParams = new URLSearchParams();
+  if (params.status) searchParams.set('status', params.status);
+  if (params.priority) searchParams.set('priority', params.priority);
+  if (params.sort) searchParams.set('sort', params.sort);
+  if (params.cursor) searchParams.set('cursor', params.cursor);
+  if (params.limit) searchParams.set('limit', String(params.limit));
+
+  const qs = searchParams.toString();
+  return apiFetch<PaginatedResponse<WishlistItem>>(
+    `/wishlist/items${qs ? `?${qs}` : ''}`
+  );
+}
+
+export async function getWishlistItem(
+  id: string
+): Promise<ApiResponse<WishlistItem>> {
+  return apiFetch<ApiResponse<WishlistItem>>(`/wishlist/items/${id}`);
+}
+
+export interface CreateWishlistItemPayload {
+  name: string;
+  image_url?: string | null;
+  source_url?: string | null;
+  price?: number | null;
+  brand?: string | null;
+  category?: ItemCategory | null;
+  priority?: WishlistPriority;
+  price_alert_threshold?: number | null;
+}
+
+export async function createWishlistItem(
+  data: CreateWishlistItemPayload
+): Promise<ApiResponse<WishlistItem>> {
+  return apiFetch<ApiResponse<WishlistItem>>('/wishlist/items', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateWishlistItem(
+  id: string,
+  updates: Partial<CreateWishlistItemPayload> & { status?: 'active' | 'purchased' | 'dismissed' }
+): Promise<ApiResponse<WishlistItem>> {
+  return apiFetch<ApiResponse<WishlistItem>>(`/wishlist/items/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteWishlistItem(
+  id: string
+): Promise<ApiResponse<WishlistItem>> {
+  return apiFetch<ApiResponse<WishlistItem>>(`/wishlist/items/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export interface ScannedWishlistItem {
+  name: string;
+  brand: string | null;
+  price: number | null;
+  category: string | null;
+  colors: string[];
+  description: string;
+}
+
+export async function scanWishlistItem(
+  imageUrl: string
+): Promise<ApiResponse<ScannedWishlistItem>> {
+  return apiFetch<ApiResponse<ScannedWishlistItem>>('/wishlist/items/scan', {
+    method: 'POST',
+    body: JSON.stringify({ image_url: imageUrl }),
+  });
+}
+
+export async function getHappinessScore(
+  itemId: string
+): Promise<ApiResponse<HappinessScore>> {
+  return apiFetch<ApiResponse<HappinessScore>>(
+    `/wishlist/items/${itemId}/happiness`,
+    { method: 'POST' }
+  );
+}
+
+export async function dismissWishlistItem(
+  id: string
+): Promise<ApiResponse<WishlistItem>> {
+  return apiFetch<ApiResponse<WishlistItem>>(
+    `/wishlist/items/${id}/dismiss`,
+    { method: 'POST' }
+  );
+}
+
+// ── Budget API ────────────────────────────────────────────────
+
+export interface BudgetCurrentResponse extends BudgetPeriod {
+  remaining_amount: number;
+  utilization_pct: number;
+}
+
+export async function getCurrentBudget(): Promise<
+  ApiResponse<BudgetCurrentResponse | null>
+> {
+  return apiFetch<ApiResponse<BudgetCurrentResponse | null>>(
+    '/wishlist/budget/current'
+  );
+}
+
+export interface SetBudgetPayload {
+  budget_amount: number;
+  period_start: string;
+  period_end: string;
+}
+
+export async function setBudget(
+  data: SetBudgetPayload
+): Promise<ApiResponse<BudgetPeriod>> {
+  return apiFetch<ApiResponse<BudgetPeriod>>('/wishlist/budget/periods', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateBudget(
+  id: string,
+  budgetAmount: number
+): Promise<ApiResponse<BudgetPeriod>> {
+  return apiFetch<ApiResponse<BudgetPeriod>>(
+    `/wishlist/budget/periods/${id}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ budget_amount: budgetAmount }),
+    }
   );
 }

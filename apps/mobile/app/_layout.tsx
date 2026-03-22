@@ -151,6 +151,14 @@ export default function RootLayout() {
               title: 'My Listings',
             }}
           />
+          {/* Hide add-wishlist-item from tabs — modal from wishlist */}
+          <Tabs.Screen
+            name="add-wishlist-item"
+            options={{
+              href: null,
+              title: 'Add to Wishlist',
+            }}
+          />
         </Tabs>
       </View>
     </QueryClientProvider>
