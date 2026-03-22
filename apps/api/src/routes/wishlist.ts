@@ -14,6 +14,22 @@ import { calculateHappinessScore, countSimilarOwned } from '../lib/happiness';
 const wishlist = new Hono<{ Variables: AppVariables }>();
 wishlist.use('*', authMiddleware);
 
+// ── Allowed image hosts (SSRF protection) ─────────────────
+const ALLOWED_IMAGE_HOSTS = new Set([
+  'alisxwjeseyqxiowkalk.supabase.co',
+  'localhost',
+  '127.0.0.1',
+]);
+
+function isAllowedImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_IMAGE_HOSTS.has(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 // ── Validation Schemas ───────────────────────────────────────
 
 const createItemSchema = z.object({
@@ -40,7 +56,6 @@ const updateItemSchema = z.object({
     .enum(['active', 'purchased', 'dismissed'] as const)
     .optional(),
   price_alert_threshold: z.number().min(0).nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
 });
 
 const listQuerySchema = z.object({
@@ -61,8 +76,8 @@ const scanSchema = z.object({
 
 const createBudgetSchema = z.object({
   budget_amount: z.number().min(0),
-  period_start: z.string(), // YYYY-MM-DD
-  period_end: z.string(),
+  period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
+  period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
 });
 
 const updateBudgetSchema = z.object({
@@ -110,7 +125,7 @@ wishlist.post('/items', zValidator('json', createItemSchema), async (c) => {
   }
 
   // Emit 'wishlisted' PreferenceSignal (append-only)
-  await supabase.from('preference_signals').insert({
+  const { error: signalError } = await supabase.from('preference_signals').insert({
     user_id: userId,
     signal_type: 'wishlisted',
     value: {
@@ -123,6 +138,10 @@ wishlist.post('/items', zValidator('json', createItemSchema), async (c) => {
       similar_owned_count: similarCount,
     },
   });
+
+  if (signalError) {
+    console.error('Failed to emit wishlisted preference signal:', signalError.message);
+  }
 
   return c.json({ data, error: null }, 201);
 });
@@ -165,6 +184,7 @@ wishlist.get('/items', zValidator('query', listQuerySchema), async (c) => {
     }
     case 'price':
       query = query.order('price', { ascending: true, nullsFirst: false });
+      query = query.order('created_at', { ascending: false });
       break;
     case 'created_at':
     default:
@@ -334,6 +354,15 @@ wishlist.post('/items/scan', zValidator('json', scanSchema), async (c) => {
   }
 
   const { image_url } = c.req.valid('json');
+
+  // SSRF protection — only allow known image hosts
+  if (!isAllowedImageUrl(image_url)) {
+    return c.json(
+      { data: null, error: { code: 'INVALID_URL', message: 'Image URL must be from a trusted source' } },
+      400
+    );
+  }
+
   const ai = new GoogleGenAI({ apiKey: geminiKey });
 
   try {
@@ -476,7 +505,7 @@ wishlist.post('/items/:id/dismiss', async (c) => {
   }
 
   // Emit 'skipped' PreferenceSignal
-  await supabase.from('preference_signals').insert({
+  const { error: skipSignalError } = await supabase.from('preference_signals').insert({
     user_id: userId,
     signal_type: 'skipped',
     value: {
@@ -488,6 +517,10 @@ wishlist.post('/items/:id/dismiss', async (c) => {
       similar_owned_count: item.similar_owned_count,
     },
   });
+
+  if (skipSignalError) {
+    console.error('Failed to emit skipped preference signal:', skipSignalError.message);
+  }
 
   return c.json({ data, error: null });
 });

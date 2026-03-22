@@ -19,6 +19,7 @@ import {
   listWishlistItems,
   getCurrentBudget,
   setBudget,
+  updateBudget,
   dismissWishlistItem,
   updateWishlistItem,
   deleteWishlistItem,
@@ -580,6 +581,9 @@ export default function WishlistScreen() {
 
   const setBudgetMutation = useMutation({
     mutationFn: async (amount: number) => {
+      if (budget) {
+        return updateBudget(budget.id, amount);
+      }
       const now = new Date();
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);

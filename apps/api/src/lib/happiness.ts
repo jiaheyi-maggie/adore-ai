@@ -155,6 +155,7 @@ function computeBudgetImpact(
   if (price == null || budgetRemaining == null || budgetAmount == null) return 5;
   if (budgetAmount <= 0) return 5;
 
+  if (budgetRemaining <= 0) return 2; // budget fully spent or overspent
   if (price > budgetRemaining) return 2; // over budget
   const ratio = price / budgetRemaining;
   // price < 20% of remaining → 10, price = 100% → 3
@@ -427,6 +428,7 @@ export async function calculateHappinessScore(
   let sameCategoryQuery = supabase
     .from('wardrobe_items')
     .select('times_worn, happiness_score, brand, colors')
+    .eq('user_id', userId)
     .neq('status', 'archived')
     .neq('status', 'sold');
 
@@ -447,6 +449,7 @@ export async function calculateHappinessScore(
     const { data: compItems } = await supabase
       .from('wardrobe_items')
       .select('category')
+      .eq('user_id', userId)
       .in('category', complementaryCategories)
       .neq('status', 'archived')
       .neq('status', 'sold');
@@ -461,13 +464,15 @@ export async function calculateHappinessScore(
   const { data: styleGoals } = await supabase
     .from('style_goals')
     .select('title, description, goal_type, target_state')
+    .eq('user_id', userId)
     .eq('status', 'active');
 
   // 5. Fetch current budget period
   const today = new Date().toISOString().split('T')[0];
   const { data: budgetPeriod } = await supabase
     .from('budget_periods')
-    .select('budget_amount, spent_amount')
+    .select('budget_amount, spent_amount, period_start, period_end')
+    .eq('user_id', userId)
     .lte('period_start', today)
     .gte('period_end', today)
     .order('period_start', { ascending: false })
@@ -478,11 +483,13 @@ export async function calculateHappinessScore(
   let budgetAmount: number | null = null;
   if (budgetPeriod) {
     budgetAmount = Number(budgetPeriod.budget_amount);
-    // Compute spent from purchases table for accuracy
+    // Compute spent from purchases table for accuracy — use actual budget period dates
     const { data: purchasesAgg } = await supabase
       .from('purchases')
       .select('total_amount')
-      .gte('purchase_date', today.slice(0, 7) + '-01')
+      .eq('user_id', userId)
+      .gte('purchase_date', budgetPeriod.period_start)
+      .lte('purchase_date', budgetPeriod.period_end)
       .in('status', ['ordered', 'delivered']);
 
     const spent = (purchasesAgg ?? []).reduce(
