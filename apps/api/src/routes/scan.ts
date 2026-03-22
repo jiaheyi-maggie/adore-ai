@@ -1,0 +1,133 @@
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import Anthropic from '@anthropic-ai/sdk';
+import {
+  ITEM_CATEGORIES,
+  PATTERNS,
+  MATERIALS,
+  SEASONS,
+  ITEM_CONDITIONS,
+  type ItemAttributes,
+} from '@adore/shared';
+import type { AppVariables } from '../lib/types';
+import { authMiddleware } from '../middleware/auth';
+
+const scan = new Hono<{ Variables: AppVariables }>();
+scan.use('*', authMiddleware);
+
+const scanSchema = z.object({
+  image_url: z.string().url(),
+});
+
+const EXTRACTION_PROMPT = `You are a fashion expert analyzing a photograph of a clothing item or accessory. Extract structured attributes from this image.
+
+Respond with ONLY a JSON object (no markdown, no explanation) matching this exact schema:
+
+{
+  "category": one of: ${ITEM_CATEGORIES.join(', ')},
+  "subcategory": string or null (e.g. "t-shirt", "blazer", "sneakers", "crossbody bag"),
+  "colors": {
+    "dominant": string (fashion color name, e.g. "navy", "cream", "burgundy"),
+    "secondary": string[] (other colors present),
+    "hex_codes": string[] (approximate hex codes for each color)
+  },
+  "pattern": one of: ${PATTERNS.join(', ')},
+  "material": one of: ${MATERIALS.join(', ')} or null if unclear,
+  "brand": string or null (if visible logo/tag),
+  "formality_level": integer 1-5 (1=very casual, 3=smart casual, 5=black tie),
+  "seasons": array of: ${SEASONS.join(', ')} (which seasons this item suits),
+  "condition": one of: ${ITEM_CONDITIONS.join(', ')},
+  "style_tags": string[] (e.g. ["minimalist", "streetwear", "vintage", "preppy"])
+}
+
+Rules:
+- Use lowercase fashion color names (not generic "blue" — prefer "navy", "cobalt", "powder blue")
+- Be specific with subcategory (not "top" — prefer "crew neck t-shirt", "button-down shirt")
+- Estimate formality based on the item itself, not how it's styled
+- Include all seasons the item could reasonably be worn in
+- If you can't determine something with confidence, use null
+- style_tags should be 2-5 descriptive tags`;
+
+// ── POST /wardrobe/items/scan — Extract attributes via Claude Vision ─
+
+scan.post('/items/scan', zValidator('json', scanSchema), async (c) => {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return c.json(
+      { data: null, error: { code: 'CONFIG_ERROR', message: 'ANTHROPIC_API_KEY not configured' } },
+      500
+    );
+  }
+
+  const supabase = c.get('supabase');
+  const userId = c.get('userId');
+  const { image_url } = c.req.valid('json');
+
+  const anthropic = new Anthropic({ apiKey: anthropicKey });
+
+  let attributes: ItemAttributes;
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'url', url: image_url },
+            },
+            {
+              type: 'text',
+              text: EXTRACTION_PROMPT,
+            },
+          ],
+        },
+      ],
+    });
+
+    // Extract the text content from the response
+    const textBlock = response.content.find((block) => block.type === 'text');
+    if (!textBlock || textBlock.type !== 'text') {
+      throw new Error('No text response from Claude');
+    }
+
+    // Parse the JSON — Claude may wrap it in markdown code blocks
+    let jsonStr = textBlock.text.trim();
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+
+    attributes = JSON.parse(jsonStr) as ItemAttributes;
+
+    // Validate the parsed result has required fields
+    if (
+      !attributes.category ||
+      !(ITEM_CATEGORIES as readonly string[]).includes(attributes.category)
+    ) {
+      throw new Error(`Invalid category: ${attributes.category}`);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to extract attributes';
+    return c.json(
+      { data: null, error: { code: 'SCAN_FAILED', message } },
+      502
+    );
+  }
+
+  // Emit 'photographed' preference signal
+  await supabase.from('preference_signals').insert({
+    user_id: userId,
+    signal_type: 'photographed',
+    value: {
+      source: 'single-item',
+      auto_attributes: attributes,
+    },
+  });
+
+  return c.json({ data: attributes, error: null });
+});
+
+export default scan;

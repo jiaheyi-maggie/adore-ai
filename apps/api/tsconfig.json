@@ -7,11 +7,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "noEmit": true,
+    "paths": {
+      "@adore/shared": ["../../packages/shared/src"]
+    }
   },
-  "include": ["src/**/*"],
-  "references": [
-    { "path": "../../packages/shared" }
-  ]
+  "include": ["src/**/*"]
 }

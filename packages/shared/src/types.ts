@@ -2,6 +2,38 @@
 // Adore — Core Domain Types
 // ═══════════════════════════════════════════════════════════
 
+// ── Utility Types ────────────────────────────────────────────
+
+/** ISO 8601 timestamp string (e.g., "2025-01-15T09:30:00.000Z") */
+export type ISOTimestamp = string;
+
+/** Standard API response envelope */
+export interface ApiResponse<T> {
+  data: T;
+  error: null;
+}
+
+/** Standard API error response */
+export interface ApiError {
+  data: null;
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+/** Paginated response with cursor-based pagination */
+export interface PaginatedResponse<T> {
+  data: T[];
+  error: null;
+  pagination: {
+    cursor: string | null; // null = no more pages
+    has_more: boolean;
+    count: number; // items in this page
+  };
+}
+
 // ── Enums ──────────────────────────────────────────────────
 
 export const ITEM_CATEGORIES = [
@@ -79,6 +111,10 @@ export const ITEM_SOURCES = [
   'email',
   'outfit-journal',
   'receipt-scan',
+  'video-scan',
+  'batch-photo',
+  'retailer-import',
+  'social-import',
 ] as const;
 export type ItemSource = (typeof ITEM_SOURCES)[number];
 
@@ -124,6 +160,7 @@ export const SIGNAL_TYPES = [
   'searched',
   'tried-on',
   'photographed',
+  'corrected_attribute',
 ] as const;
 export type SignalType = (typeof SIGNAL_TYPES)[number];
 
@@ -151,6 +188,34 @@ export const COLOR_SEASONS = [
 ] as const;
 export type ColorSeason = (typeof COLOR_SEASONS)[number];
 
+export const PURCHASE_STATUSES = [
+  'ordered',
+  'delivered',
+  'returned',
+  'partial_return',
+] as const;
+export type PurchaseStatus = (typeof PURCHASE_STATUSES)[number];
+
+export const PURCHASE_SOURCES = [
+  'manual',
+  'email',
+  'receipt_scan',
+] as const;
+export type PurchaseSource = (typeof PURCHASE_SOURCES)[number];
+
+export const MESSAGE_ROLES = ['user', 'assistant', 'system'] as const;
+export type MessageRole = (typeof MESSAGE_ROLES)[number];
+
+/** Named keys for formality distribution (replaces number[] for clarity) */
+export const FORMALITY_LEVELS = [
+  'casual',
+  'smart_casual',
+  'business',
+  'formal',
+  'black_tie',
+] as const;
+export type FormalityLevel = (typeof FORMALITY_LEVELS)[number];
+
 // ── Core Entities ──────────────────────────────────────────
 
 export interface User {
@@ -159,8 +224,8 @@ export interface User {
   name: string;
   budget_monthly: number | null;
   onboarding_completed: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
 }
 
 export interface StyleProfile {
@@ -170,13 +235,14 @@ export interface StyleProfile {
   skin_undertone: 'warm' | 'cool' | 'neutral' | null;
   style_archetypes: Record<string, number>; // e.g. { minimalist: 0.4, classic: 0.3 }
   color_preferences: Record<string, number>; // e.g. { navy: 0.9, black: 0.8 }
-  formality_distribution: number[]; // [casual%, smart-casual%, business%, formal%, black-tie%]
+  formality_distribution: Record<FormalityLevel, number>; // named keys, not array
   brand_affinities: Record<string, number>;
   price_range: { min: number; max: number; sweet_spot: number };
   avoided_styles: string[];
   body_metrics: Record<string, number> | null;
-  taste_vector: number[] | null; // aggregated embedding
-  updated_at: string;
+  taste_vector: number[] | null; // aggregated embedding (512-dim)
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
 }
 
 export interface WardrobeItem {
@@ -185,6 +251,7 @@ export interface WardrobeItem {
   name: string;
   category: ItemCategory;
   subcategory: string | null;
+  /** Normalized color names (lowercase, e.g. "navy", "cream", "black") */
   colors: string[];
   pattern: Pattern;
   material: Material | null;
@@ -205,8 +272,8 @@ export interface WardrobeItem {
   status: ItemStatus;
   source: ItemSource;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
 }
 
 export interface ItemEmbedding {
@@ -214,7 +281,7 @@ export interface ItemEmbedding {
   item_id: string;
   embedding: number[]; // 512-dim FashionSigLIP
   model_version: string;
-  created_at: string;
+  created_at: ISOTimestamp;
 }
 
 export interface Outfit {
@@ -228,7 +295,8 @@ export interface Outfit {
   worn_date: string | null;
   photo_url: string | null;
   notes: string | null;
-  created_at: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
 }
 
 export interface OutfitItem {
@@ -248,7 +316,7 @@ export interface PreferenceSignal {
   outfit_id: string | null;
   value: Record<string, unknown>; // flexible payload
   context: Record<string, unknown> | null; // weather, occasion, etc.
-  created_at: string;
+  created_at: ISOTimestamp;
 }
 
 export interface WishlistItem {
@@ -266,8 +334,8 @@ export interface WishlistItem {
   versatility_impact: number | null;
   status: 'active' | 'purchased' | 'dismissed';
   price_alert_threshold: number | null;
-  created_at: string;
-  updated_at: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
 }
 
 export interface AgentMemory {
@@ -278,9 +346,9 @@ export interface AgentMemory {
   embedding: number[] | null;
   importance_score: number;
   access_count: number;
-  last_accessed_at: string;
+  last_accessed_at: ISOTimestamp;
   superseded_by: string | null;
-  created_at: string;
+  created_at: ISOTimestamp;
 }
 
 export interface BudgetPeriod {
@@ -293,6 +361,8 @@ export interface BudgetPeriod {
   happiness_per_dollar: number | null;
   impulse_buy_count: number;
   planned_buy_count: number;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
 }
 
 export interface ExternalProduct {
@@ -307,8 +377,8 @@ export interface ExternalProduct {
   retailer: string;
   attributes: Record<string, unknown>;
   embedding: number[] | null;
-  last_checked_at: string;
-  created_at: string;
+  last_checked_at: ISOTimestamp;
+  created_at: ISOTimestamp;
 }
 
 export interface StyleGoal {
@@ -321,9 +391,142 @@ export interface StyleGoal {
   current_progress: number; // 0-100
   deadline: string | null;
   status: 'active' | 'completed' | 'paused' | 'abandoned';
-  created_at: string;
-  updated_at: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
 }
+
+// ── New Entities (Phase 1+) ──────────────────────────────────
+
+export interface Purchase {
+  id: string;
+  user_id: string;
+  wardrobe_item_id: string | null;
+  retailer: string;
+  order_number: string | null;
+  purchase_date: string; // date only (YYYY-MM-DD)
+  items_data: PurchaseLineItem[];
+  total_amount: number;
+  status: PurchaseStatus;
+  source: PurchaseSource;
+  email_id: string | null;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}
+
+export interface PurchaseLineItem {
+  name: string;
+  category: ItemCategory | null;
+  color: string | null;
+  size: string | null;
+  price: number;
+  product_url: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  user_id: string;
+  title: string | null;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: MessageRole;
+  content: string;
+  tool_calls: Record<string, unknown>[] | null;
+  token_usage: { input: number; output: number } | null;
+  created_at: ISOTimestamp;
+}
+
+// ── Wardrobe Scanning ──────────────────────────────────────────
+
+export const SCAN_METHODS = [
+  'video-closet',
+  'batch-photo',
+  'single-item',
+  'outfit-journal',
+  'email-import',
+  'retailer-import',
+  'social-import',
+] as const;
+export type ScanMethod = (typeof SCAN_METHODS)[number];
+
+export interface WardrobeScan {
+  id: string;
+  user_id: string;
+  method: ScanMethod;
+  status: 'processing' | 'review' | 'confirmed' | 'failed';
+  source_media_url: string | null;
+  items_detected: number;
+  items_confirmed: number;
+  items_rejected: number;
+  processing_started_at: ISOTimestamp;
+  processing_completed_at: ISOTimestamp | null;
+  error: string | null;
+  created_at: ISOTimestamp;
+}
+
+export interface ItemAttributes {
+  category: ItemCategory;
+  subcategory: string | null;
+  colors: {
+    dominant: string;
+    secondary: string[];
+    hex_codes: string[];
+  };
+  pattern: Pattern;
+  material: Material | null;
+  brand: string | null;
+  formality_level: number;
+  seasons: Season[];
+  condition: ItemCondition;
+  style_tags: string[];
+}
+
+export interface ScanDetection {
+  id: string;
+  scan_id: string;
+  wardrobe_item_id: string | null;
+  crop_image_url: string;
+  clean_image_url: string | null;
+  detection_confidence: number;
+  classification_confidence: number;
+  auto_attributes: ItemAttributes;
+  user_attributes: Partial<ItemAttributes> | null;
+  status: 'pending' | 'confirmed' | 'rejected' | 'merged';
+  merged_with_item_id: string | null;
+  source_frame_index: number | null;
+  created_at: ISOTimestamp;
+}
+
+// ── Input Types (Omit server-generated fields) ────────────────
+
+export type CreateWardrobeItem = Omit<
+  WardrobeItem,
+  | 'id'
+  | 'user_id'
+  | 'times_worn'
+  | 'cost_per_wear'
+  | 'happiness_score'
+  | 'versatility_score'
+  | 'created_at'
+  | 'updated_at'
+>;
+
+export type CreateOutfit = Omit<Outfit, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
+
+export type CreateWishlistItem = Omit<
+  WishlistItem,
+  | 'id'
+  | 'user_id'
+  | 'happiness_score_prediction'
+  | 'similar_owned_count'
+  | 'versatility_impact'
+  | 'created_at'
+  | 'updated_at'
+>;
 
 // ── Happiness Function ─────────────────────────────────────
 
@@ -345,7 +548,13 @@ export interface HappinessScore {
 }
 
 export interface HappinessFlag {
-  type: 'impulse-warning' | 'duplicate-alert' | 'budget-exceeded' | 'goal-aligned' | 'goal-conflict' | 'high-return-risk';
+  type:
+    | 'impulse-warning'
+    | 'duplicate-alert'
+    | 'budget-exceeded'
+    | 'goal-aligned'
+    | 'goal-conflict'
+    | 'high-return-risk';
   message: string;
   severity: 'info' | 'warning' | 'critical';
 }
@@ -360,7 +569,7 @@ export interface HappinessWeights {
   w_emotional: number;
   w_cost_per_wear: number;
   w_seasonal: number;
-  updated_at: string;
+  updated_at: ISOTimestamp;
 }
 
 // ── Weather & Context ──────────────────────────────────────
@@ -399,14 +608,7 @@ export interface OutfitSuggestion {
 export interface ParsedPurchase {
   retailer: string;
   order_date: string;
-  items: {
-    name: string;
-    category: ItemCategory | null;
-    color: string | null;
-    size: string | null;
-    price: number;
-    product_url: string | null;
-  }[];
+  items: PurchaseLineItem[];
   total: number;
   order_number: string | null;
   confidence: number; // 0-1

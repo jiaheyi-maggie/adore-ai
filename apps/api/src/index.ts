@@ -1,11 +1,24 @@
 import { Hono } from 'hono';
+import { logger } from 'hono/logger';
+import { cors } from 'hono/cors';
+
+import wardrobeRoutes from './routes/wardrobe';
+import uploadRoutes from './routes/upload';
+import bgRemovalRoutes from './routes/background-removal';
+import scanRoutes from './routes/scan';
 
 const app = new Hono();
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection:', reason);
-  process.exit(1);
-});
+// Middleware
+app.use('*', logger());
+app.use(
+  '*',
+  cors({
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:8081'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 // Health check
 app.get('/', (c) => {
@@ -16,18 +29,21 @@ app.get('/', (c) => {
   });
 });
 
-// TODO: Route modules
-// app.route('/auth', authRoutes);
-// app.route('/wardrobe', wardrobeRoutes);
-// app.route('/outfits', outfitRoutes);
-// app.route('/agent', agentRoutes);
-// app.route('/wishlist', wishlistRoutes);
-// app.route('/budget', budgetRoutes);
-// app.route('/analytics', analyticsRoutes);
+app.get('/health', (c) => {
+  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Route modules
+app.route('/wardrobe', wardrobeRoutes);
+app.route('/wardrobe', uploadRoutes);
+app.route('/wardrobe', bgRemovalRoutes);
+app.route('/wardrobe', scanRoutes);
+
+const port = Number(process.env.PORT) || 3000;
 
 export default {
-  port: Number(process.env.PORT) || 3000,
+  port,
   fetch: app.fetch,
 };
 
-console.log(`Adore API running on port ${Number(process.env.PORT) || 3000}`);
+console.log(`Adore API running on http://localhost:${port}`);
