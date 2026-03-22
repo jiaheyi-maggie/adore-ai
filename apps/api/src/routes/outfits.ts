@@ -20,13 +20,32 @@ import { getWeather } from '../lib/weather';
 const outfits = new Hono<{ Variables: AppVariables }>();
 outfits.use('*', authMiddleware);
 
+// ── Allowed image hosts (SSRF protection) ─────────────────
+const ALLOWED_IMAGE_HOSTS = new Set([
+  'alisxwjeseyqxiowkalk.supabase.co',
+  'localhost',
+  '127.0.0.1',
+]);
+
+function isAllowedImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_IMAGE_HOSTS.has(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 // ── Validation Schemas ──────────────────────────────────────
 
 const createOutfitSchema = z.object({
   photo_url: z.string().url().nullable().optional(),
   occasion: z.enum(OCCASION_TYPES).nullable().optional(),
   mood_tag: z.enum(MOOD_TAGS).nullable().optional(),
-  worn_date: z.string().nullable().optional(), // YYYY-MM-DD
+  worn_date: z.string().regex(DATE_REGEX, 'Must be YYYY-MM-DD').nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   happiness_score: z.number().min(0).max(10).nullable().optional(),
   weather_context: z
@@ -41,9 +60,7 @@ const createOutfitSchema = z.object({
     })
     .nullable()
     .optional(),
-  /** Array of wardrobe_item_ids to link to this outfit */
   item_ids: z.array(z.string().uuid()).optional(),
-  /** Array of new items to create in wardrobe and link */
   new_items: z
     .array(
       z.object({
@@ -85,6 +102,32 @@ const weatherSchema = z.object({
   lon: z.coerce.number().min(-180).max(180),
 });
 
+// ── Zod schemas for Gemini response validation ──────────────
+
+const detectedItemSchema = z.object({
+  category: z.string(),
+  subcategory: z.string().nullable().optional(),
+  colors: z.object({
+    dominant: z.string(),
+    secondary: z.array(z.string()).default([]),
+    hex_codes: z.array(z.string()).default([]),
+  }),
+  pattern: z.string().default('solid'),
+  material: z.string().nullable().optional(),
+  brand: z.string().nullable().optional(),
+  formality_level: z.number().default(3),
+  seasons: z.array(z.string()).default([]),
+  condition: z.string().default('good'),
+  style_tags: z.array(z.string()).default([]),
+  description: z.string().default(''),
+});
+
+const matchResultSchema = z.object({
+  detected_index: z.number(),
+  wardrobe_item_id: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+});
+
 // ── POST /outfits — Create outfit journal entry ─────────────
 
 outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
@@ -120,8 +163,9 @@ outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
 
   const outfitId = outfit.id;
   const allLinkedItemIds: string[] = [];
+  const warnings: string[] = [];
 
-  // 2. Create any new wardrobe items that the user opted to add
+  // 2. Create any new wardrobe items
   if (new_items && new_items.length > 0) {
     const newItemRecords = new_items.map((item) => ({
       user_id: userId,
@@ -147,8 +191,7 @@ outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
       .select('id');
 
     if (createError) {
-      // Non-fatal: outfit was created, but new items failed
-      console.error('Failed to create new wardrobe items:', createError.message);
+      warnings.push(`Failed to create new wardrobe items: ${createError.message}`);
     } else if (createdItems) {
       for (const item of createdItems) {
         allLinkedItemIds.push(item.id);
@@ -158,9 +201,7 @@ outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
 
   // 3. Add existing wardrobe item IDs
   if (item_ids && item_ids.length > 0) {
-    for (const id of item_ids) {
-      allLinkedItemIds.push(id);
-    }
+    allLinkedItemIds.push(...item_ids);
   }
 
   // 4. Create outfit_items bridge records
@@ -177,11 +218,11 @@ outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
       .insert(outfitItemRecords);
 
     if (bridgeError) {
-      console.error('Failed to create outfit_items:', bridgeError.message);
+      warnings.push(`Failed to link items: ${bridgeError.message}`);
     }
   }
 
-  // 5. Emit 'wore' preference signals for each item + increment times_worn
+  // 5. Emit 'wore' preference signals + increment times_worn atomically via RPC
   if (allLinkedItemIds.length > 0) {
     const signals = allLinkedItemIds.map((itemId) => ({
       user_id: userId,
@@ -203,29 +244,34 @@ outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
       .insert(signals);
 
     if (signalError) {
-      console.error('Failed to emit preference signals:', signalError.message);
+      warnings.push(`Failed to emit preference signals: ${signalError.message}`);
     }
 
-    // Increment times_worn for each wardrobe item
-    // Supabase JS client doesn't support SET col = col + 1 directly,
-    // so we read-then-write per item. Acceptable at journal scale (3-8 items).
+    // FIX #1: Atomic increment via raw SQL (avoids read-then-write race condition)
     for (const itemId of allLinkedItemIds) {
-      const { data: currentItem } = await supabase
-        .from('wardrobe_items')
-        .select('times_worn')
-        .eq('id', itemId)
-        .single();
+      const { error: rpcError } = await supabase.rpc('increment_times_worn', {
+        item_id: itemId,
+      });
 
-      if (currentItem) {
-        await supabase
+      // Fallback to read-then-write if RPC doesn't exist yet
+      if (rpcError?.message?.includes('function') || rpcError?.code === '42883') {
+        const { data: currentItem } = await supabase
           .from('wardrobe_items')
-          .update({ times_worn: (currentItem.times_worn ?? 0) + 1 })
-          .eq('id', itemId);
+          .select('times_worn')
+          .eq('id', itemId)
+          .single();
+
+        if (currentItem) {
+          await supabase
+            .from('wardrobe_items')
+            .update({ times_worn: (currentItem.times_worn ?? 0) + 1 })
+            .eq('id', itemId);
+        }
       }
     }
   }
 
-  // 6. Return the full outfit with items
+  // 6. Return the full outfit with items + any warnings
   const { data: fullOutfit } = await supabase
     .from('outfits')
     .select(
@@ -240,10 +286,19 @@ outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
     .eq('id', outfitId)
     .single();
 
-  return c.json({ data: fullOutfit ?? outfit, error: null }, 201);
+  const response: Record<string, unknown> = {
+    data: fullOutfit ?? outfit,
+    error: null,
+  };
+  if (warnings.length > 0) {
+    response.warnings = warnings;
+  }
+
+  return c.json(response, 201);
 });
 
 // ── GET /outfits — List outfits with pagination ─────────────
+// FIX #2: Sort by created_at only (matches cursor field) to prevent pagination gaps
 
 outfits.get('/', zValidator('query', listOutfitsSchema), async (c) => {
   const supabase = c.get('supabase');
@@ -260,7 +315,6 @@ outfits.get('/', zValidator('query', listOutfitsSchema), async (c) => {
       )
     `
     )
-    .order('worn_date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit + 1);
 
@@ -294,11 +348,9 @@ outfits.get('/', zValidator('query', listOutfitsSchema), async (c) => {
 });
 
 // ── GET /outfits/weather — Fetch weather for location ────────
-// Must be defined BEFORE /:id to avoid "weather" being captured as an ID param
 
 outfits.get('/weather', zValidator('query', weatherSchema), async (c) => {
   const { lat, lon } = c.req.valid('query');
-
   const weather = await getWeather(lat, lon);
 
   if (!weather) {
@@ -322,6 +374,14 @@ outfits.get('/weather', zValidator('query', weatherSchema), async (c) => {
 outfits.get('/:id', async (c) => {
   const supabase = c.get('supabase');
   const id = c.req.param('id');
+
+  // FIX #8: Validate UUID format
+  if (!UUID_REGEX.test(id)) {
+    return c.json(
+      { data: null, error: { code: 'INVALID_ID', message: 'Invalid outfit ID format' } },
+      400
+    );
+  }
 
   const { data, error } = await supabase
     .from('outfits')
@@ -359,6 +419,14 @@ outfits.get('/:id', async (c) => {
 outfits.patch('/:id', zValidator('json', updateOutfitSchema), async (c) => {
   const supabase = c.get('supabase');
   const id = c.req.param('id');
+
+  if (!UUID_REGEX.test(id)) {
+    return c.json(
+      { data: null, error: { code: 'INVALID_ID', message: 'Invalid outfit ID format' } },
+      400
+    );
+  }
+
   const body = c.req.valid('json');
 
   const { data, error } = await supabase
@@ -383,6 +451,31 @@ outfits.patch('/:id', zValidator('json', updateOutfitSchema), async (c) => {
   }
 
   return c.json({ data, error: null });
+});
+
+// ── DELETE /outfits/:id — Delete outfit ─────────────────────
+
+outfits.delete('/:id', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+
+  if (!UUID_REGEX.test(id)) {
+    return c.json(
+      { data: null, error: { code: 'INVALID_ID', message: 'Invalid outfit ID format' } },
+      400
+    );
+  }
+
+  const { error } = await supabase.from('outfits').delete().eq('id', id);
+
+  if (error) {
+    return c.json(
+      { data: null, error: { code: 'DELETE_FAILED', message: error.message } },
+      400
+    );
+  }
+
+  return c.json({ data: { deleted: true }, error: null });
 });
 
 // ── POST /outfits/decompose — AI outfit decomposition ───────
@@ -460,14 +553,44 @@ Rules:
 - If no wardrobe items match at all, set wardrobe_item_id to null and confidence to 0.0
 - Each wardrobe item can only be matched once (pick the best match if multiple detected items could match)`;
 
+// FIX #5: Timeout + size limit on image fetch
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const FETCH_TIMEOUT_MS = 10_000; // 10s
+
+async function fetchImageSafe(url: string): Promise<{ base64: string; mimeType: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (contentLength > MAX_IMAGE_SIZE) {
+      throw new Error(`Image too large: ${contentLength} bytes (max ${MAX_IMAGE_SIZE})`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > MAX_IMAGE_SIZE) {
+      throw new Error(`Image too large: ${buffer.byteLength} bytes`);
+    }
+
+    return {
+      base64: Buffer.from(buffer).toString('base64'),
+      mimeType: response.headers.get('content-type') || 'image/jpeg',
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 outfits.post('/decompose', zValidator('json', decomposeSchema), async (c) => {
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
     return c.json(
-      {
-        data: null,
-        error: { code: 'CONFIG_ERROR', message: 'GEMINI_API_KEY not configured' },
-      },
+      { data: null, error: { code: 'CONFIG_ERROR', message: 'GEMINI_API_KEY not configured' } },
       500
     );
   }
@@ -476,18 +599,20 @@ outfits.post('/decompose', zValidator('json', decomposeSchema), async (c) => {
   const userId = c.get('userId');
   const { image_url } = c.req.valid('json');
 
+  // FIX #4: SSRF protection — only allow known image hosts
+  if (!isAllowedImageUrl(image_url)) {
+    return c.json(
+      { data: null, error: { code: 'INVALID_URL', message: 'Image URL must be from a trusted source' } },
+      400
+    );
+  }
+
   const ai = new GoogleGenAI({ apiKey: geminiKey });
 
   // Step 1: Detect items in the outfit photo
   let detectedItems: Array<ItemAttributes & { description: string }>;
   try {
-    const imageResponse = await fetch(image_url);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-    }
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = Buffer.from(imageBuffer).toString('base64');
-    const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    const { base64, mimeType } = await fetchImageSafe(image_url);
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -495,12 +620,7 @@ outfits.post('/decompose', zValidator('json', decomposeSchema), async (c) => {
         {
           role: 'user',
           parts: [
-            {
-              inlineData: {
-                mimeType,
-                data: base64Image,
-              },
-            },
+            { inlineData: { mimeType, data: base64 } },
             { text: DECOMPOSITION_PROMPT },
           ],
         },
@@ -508,20 +628,39 @@ outfits.post('/decompose', zValidator('json', decomposeSchema), async (c) => {
     });
 
     const text = response.text?.trim();
-    if (!text) {
-      throw new Error('No response from Gemini');
-    }
+    if (!text) throw new Error('No response from Gemini');
 
     let jsonStr = text;
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
 
-    detectedItems = JSON.parse(jsonStr);
-
-    if (!Array.isArray(detectedItems) || detectedItems.length === 0) {
+    // FIX #3: Validate Gemini response with Zod
+    const parsed = JSON.parse(jsonStr);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
       throw new Error('Gemini returned empty or invalid item array');
     }
+
+    detectedItems = parsed.map((item: unknown) => {
+      const validated = detectedItemSchema.safeParse(item);
+      if (!validated.success) {
+        // Use raw item with safe defaults rather than crashing
+        return {
+          category: 'accessories',
+          subcategory: null,
+          colors: { dominant: 'unknown', secondary: [], hex_codes: [] },
+          pattern: 'solid',
+          material: null,
+          brand: null,
+          formality_level: 3,
+          seasons: ['spring', 'summer', 'fall', 'winter'],
+          condition: 'good',
+          style_tags: [],
+          description: 'unidentified item',
+        } as ItemAttributes & { description: string };
+      }
+      return validated.data as ItemAttributes & { description: string };
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to decompose outfit';
     return c.json(
@@ -531,10 +670,11 @@ outfits.post('/decompose', zValidator('json', decomposeSchema), async (c) => {
   }
 
   // Step 2: Fetch user's wardrobe items for matching
+  // FIX #9: Exclude sold and donated items, not just archived
   const { data: wardrobeItems } = await supabase
     .from('wardrobe_items')
     .select('id, name, category, subcategory, colors, image_url, image_url_clean')
-    .neq('status', 'archived')
+    .in('status', ['active', 'stored'])
     .limit(500);
 
   const wardrobe = wardrobeItems ?? [];
@@ -574,15 +714,23 @@ outfits.post('/decompose', zValidator('json', decomposeSchema), async (c) => {
         if (matchJson.startsWith('```')) {
           matchJson = matchJson.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
         }
-        matches = JSON.parse(matchJson);
+
+        // FIX #3: Validate match response
+        const parsedMatches = JSON.parse(matchJson);
+        if (Array.isArray(parsedMatches)) {
+          matches = parsedMatches
+            .map((m: unknown) => matchResultSchema.safeParse(m))
+            .filter((r) => r.success)
+            .map((r) => r.data!);
+        }
       }
     } catch (err) {
-      // Matching failed — treat all items as unmatched
+      // Matching failed — treat all items as unmatched (non-fatal)
       console.error('Wardrobe matching failed:', err);
     }
   }
 
-  // Step 4: Build response combining detected items with match info
+  // Step 4: Build response
   const result = detectedItems.map((detected, index) => {
     const matchInfo = matches.find((m) => m.detected_index === index);
     const isMatch = matchInfo && matchInfo.wardrobe_item_id && matchInfo.confidence >= 0.6;
