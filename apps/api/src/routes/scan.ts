@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import {
   ITEM_CATEGORIES,
   PATTERNS,
@@ -49,13 +49,13 @@ Rules:
 - If you can't determine something with confidence, use null
 - style_tags should be 2-5 descriptive tags`;
 
-// ── POST /wardrobe/items/scan — Extract attributes via Claude Vision ─
+// ── POST /wardrobe/items/scan — Extract attributes via Gemini Vision ─
 
 scan.post('/items/scan', zValidator('json', scanSchema), async (c) => {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
     return c.json(
-      { data: null, error: { code: 'CONFIG_ERROR', message: 'ANTHROPIC_API_KEY not configured' } },
+      { data: null, error: { code: 'CONFIG_ERROR', message: 'GEMINI_API_KEY not configured' } },
       500
     );
   }
@@ -64,38 +64,45 @@ scan.post('/items/scan', zValidator('json', scanSchema), async (c) => {
   const userId = c.get('userId');
   const { image_url } = c.req.valid('json');
 
-  const anthropic = new Anthropic({ apiKey: anthropicKey });
+  const ai = new GoogleGenAI({ apiKey: geminiKey });
 
   let attributes: ItemAttributes;
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      messages: [
+    // Fetch the image and convert to base64 for Gemini
+    const imageResponse = await fetch(image_url);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    }
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString('base64');
+    const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
         {
           role: 'user',
-          content: [
+          parts: [
             {
-              type: 'image',
-              source: { type: 'url', url: image_url },
+              inlineData: {
+                mimeType,
+                data: base64Image,
+              },
             },
-            {
-              type: 'text',
-              text: EXTRACTION_PROMPT,
-            },
+            { text: EXTRACTION_PROMPT },
           ],
         },
       ],
     });
 
-    // Extract the text content from the response
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
-      throw new Error('No text response from Claude');
+    // Extract text from response
+    const text = response.text?.trim();
+    if (!text) {
+      throw new Error('No text response from Gemini');
     }
 
-    // Parse the JSON — Claude may wrap it in markdown code blocks
-    let jsonStr = textBlock.text.trim();
+    // Parse JSON — Gemini may wrap in markdown code blocks
+    let jsonStr = text;
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
