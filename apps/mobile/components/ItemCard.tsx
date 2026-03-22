@@ -1,5 +1,6 @@
 import { View, Text, Image, StyleSheet, Pressable, Dimensions } from 'react-native';
 import type { WardrobeItem } from '@adore/shared';
+import { colors, fonts, categoryColors } from '../lib/theme';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_GAP = 12;
@@ -11,24 +12,15 @@ interface ItemCardProps {
   onPress?: () => void;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  tops: '#E3F2FD',
-  bottoms: '#FFF3E0',
-  dresses: '#FCE4EC',
-  outerwear: '#E8EAF6',
-  shoes: '#F3E5F5',
-  accessories: '#E0F7FA',
-  bags: '#FFF9C4',
-  jewelry: '#F9FBE7',
-  activewear: '#E8F5E9',
-  swimwear: '#E0F2F1',
-  sleepwear: '#EDE7F6',
-  undergarments: '#FAFAFA',
-};
-
 export default function ItemCard({ item, onPress }: ItemCardProps) {
   const imageUrl = item.image_url_clean ?? item.image_url;
-  const badgeColor = CATEGORY_COLORS[item.category] ?? '#F5F5F5';
+  const dotColor = categoryColors[item.category] ?? colors.textMuted;
+
+  // Cost-per-wear calculation (if data available)
+  const costPerWear =
+    item.purchase_price != null && item.times_worn != null && item.times_worn > 0
+      ? (item.purchase_price / item.times_worn).toFixed(2)
+      : null;
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -45,8 +37,14 @@ export default function ItemCard({ item, onPress }: ItemCardProps) {
         <Text style={styles.name} numberOfLines={1}>
           {item.name}
         </Text>
-        <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-          <Text style={styles.badgeText}>{item.category}</Text>
+        <View style={styles.metaRow}>
+          <View style={styles.badge}>
+            <View style={[styles.categoryDot, { backgroundColor: dotColor }]} />
+            <Text style={styles.badgeText}>{item.category}</Text>
+          </View>
+          {costPerWear && (
+            <Text style={styles.cpw}>${costPerWear}/wear</Text>
+          )}
         </View>
       </View>
     </Pressable>
@@ -56,20 +54,20 @@ export default function ItemCard({ item, onPress }: ItemCardProps) {
 const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
     overflow: 'hidden',
     marginBottom: CARD_GAP,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#2D2926',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 2,
   },
   imageContainer: {
     width: '100%',
     height: CARD_WIDTH * 1.2,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.accentSoft,
   },
   image: {
     width: '100%',
@@ -81,27 +79,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   placeholderText: {
+    fontFamily: fonts.inter.regular,
     fontSize: 12,
-    color: '#ccc',
+    color: colors.textMuted,
   },
   info: {
     padding: 10,
   },
   name: {
+    fontFamily: fonts.inter.medium,
     fontSize: 13,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     marginBottom: 6,
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   badge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  categoryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   badgeText: {
+    fontFamily: fonts.inter.medium,
     fontSize: 11,
-    color: '#555',
+    fontWeight: '500',
+    color: colors.textSecondary,
     textTransform: 'capitalize',
+    letterSpacing: 0.5,
+  },
+  cpw: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.accent,
   },
 });

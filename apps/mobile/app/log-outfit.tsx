@@ -28,6 +28,7 @@ import {
   type DecomposedItem,
   type CreateOutfitPayload,
 } from '../lib/api';
+import { colors, fonts } from '../lib/theme';
 
 // ── Constants ─────────────────────────────────────────────────
 
@@ -243,7 +244,7 @@ export default function LogOutfitScreen() {
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={() => pickImage('library')}>
-            <Ionicons name="images-outline" size={22} color="#1a1a1a" />
+            <Ionicons name="images-outline" size={22} color={colors.secondary} />
             <Text style={styles.secondaryButtonText}>Choose from Library</Text>
           </Pressable>
 
@@ -268,7 +269,7 @@ export default function LogOutfitScreen() {
               resizeMode="cover"
             />
           )}
-          <ActivityIndicator size="large" color="#1a1a1a" style={styles.processingSpinner} />
+          <ActivityIndicator size="large" color={colors.accent} style={styles.processingSpinner} />
           <Text style={styles.processingText}>{processingStatus}</Text>
           <Text style={styles.processingSubtext}>
             Detecting individual items in your outfit...
@@ -343,7 +344,7 @@ export default function LogOutfitScreen() {
 
                   {item.match ? (
                     <View style={styles.matchBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
                       <Text style={styles.matchBadgeText}>In wardrobe</Text>
                     </View>
                   ) : (
@@ -354,7 +355,7 @@ export default function LogOutfitScreen() {
                         onValueChange={(val) =>
                           setAddToWardrobe((prev) => ({ ...prev, [index]: val }))
                         }
-                        trackColor={{ false: '#ddd', true: '#1a1a1a' }}
+                        trackColor={{ false: colors.border, true: colors.accent }}
                         thumbColor="#fff"
                       />
                     </View>
@@ -457,7 +458,7 @@ export default function LogOutfitScreen() {
               value={notes}
               onChangeText={setNotes}
               placeholder="How's the fit? Any styling notes?"
-              placeholderTextColor="#bbb"
+              placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={3}
             />
@@ -509,7 +510,7 @@ export default function LogOutfitScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.processingContainer}>
-        <ActivityIndicator size="large" color="#1a1a1a" />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.processingText}>Saving outfit...</Text>
       </View>
     </View>
@@ -532,7 +533,7 @@ function Chip({ label, color }: { label: string; color?: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
   },
   pickContainer: {
     flex: 1,
@@ -541,14 +542,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: fonts.cormorant.medium,
+    fontSize: 28,
+    fontWeight: '500',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
+    fontFamily: fonts.inter.regular,
     fontSize: 14,
-    color: '#888',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 20,
@@ -557,7 +560,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 28,
@@ -566,6 +569,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryButtonText: {
+    fontFamily: fonts.inter.semibold,
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
@@ -574,7 +578,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderColor: '#1a1a1a',
+    borderColor: colors.secondary,
     borderWidth: 1,
     paddingHorizontal: 28,
     paddingVertical: 14,
@@ -584,7 +588,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   secondaryButtonText: {
-    color: '#1a1a1a',
+    fontFamily: fonts.inter.medium,
+    color: colors.secondary,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -595,7 +600,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   cancelText: {
-    color: '#888',
+    fontFamily: fonts.inter.regular,
+    color: colors.textSecondary,
     fontSize: 14,
   },
 
@@ -616,14 +622,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   processingText: {
+    fontFamily: fonts.inter.medium,
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   processingSubtext: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 
@@ -639,7 +647,7 @@ const styles = StyleSheet.create({
   outfitImageContainer: {
     width: '100%',
     height: 360,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.accentSoft,
     position: 'relative',
   },
   outfitImage: {
@@ -656,6 +664,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   weatherText: {
+    fontFamily: fonts.inter.medium,
     color: '#fff',
     fontSize: 12,
     fontWeight: '500',
@@ -667,26 +676,28 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: fonts.cormorant.medium,
+    fontSize: 18,
+    fontWeight: '500',
+    color: colors.textPrimary,
     marginBottom: 12,
   },
   matchSummary: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
     marginTop: -8,
     marginBottom: 12,
   },
 
   // Detected items
   detectedItem: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: colors.border,
   },
   detectedItemHeader: {
     flexDirection: 'row',
@@ -698,9 +709,10 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   detectedItemName: {
+    fontFamily: fonts.inter.medium,
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     marginBottom: 6,
     textTransform: 'capitalize',
   },
@@ -712,15 +724,16 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.accentSoft,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 5,
   },
   chipText: {
+    fontFamily: fonts.inter.regular,
     fontSize: 12,
-    color: '#555',
+    color: colors.secondary,
     textTransform: 'capitalize',
   },
   colorDot: {
@@ -728,7 +741,7 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
   },
 
   // Match badge
@@ -742,8 +755,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   matchBadgeText: {
+    fontFamily: fonts.inter.medium,
     fontSize: 12,
-    color: '#22c55e',
+    color: colors.success,
     fontWeight: '500',
   },
   matchDetail: {
@@ -752,18 +766,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f5f5f5',
+    borderTopColor: colors.border,
     gap: 8,
   },
   matchThumbnail: {
     width: 32,
     height: 32,
     borderRadius: 6,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.accentSoft,
   },
   matchName: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
     flex: 1,
   },
 
@@ -774,8 +789,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addToggleLabel: {
+    fontFamily: fonts.inter.regular,
     fontSize: 12,
-    color: '#888',
+    color: colors.textSecondary,
   },
 
   // Occasion picker
@@ -786,24 +802,25 @@ const styles = StyleSheet.create({
   occasionChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
     gap: 6,
   },
   occasionChipSelected: {
-    backgroundColor: '#1a1a1a',
-    borderColor: '#1a1a1a',
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   occasionEmoji: {
     fontSize: 16,
   },
   occasionText: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#555',
+    color: colors.secondary,
     textTransform: 'capitalize',
   },
   occasionTextSelected: {
@@ -814,24 +831,25 @@ const styles = StyleSheet.create({
   moodChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
     gap: 6,
   },
   moodChipSelected: {
-    backgroundColor: '#1a1a1a',
-    borderColor: '#1a1a1a',
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   moodEmoji: {
     fontSize: 18,
   },
   moodText: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#555',
+    color: colors.secondary,
     textTransform: 'capitalize',
   },
   moodTextSelected: {
@@ -840,14 +858,15 @@ const styles = StyleSheet.create({
 
   // Notes
   notesInput: {
-    backgroundColor: '#fff',
+    fontFamily: fonts.inter.regular,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     minHeight: 80,
     textAlignVertical: 'top',
   },

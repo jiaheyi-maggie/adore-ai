@@ -1,12 +1,13 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, fonts } from '../lib/theme';
 
 export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color="#ccc" />
+          <Ionicons name="person" size={40} color={colors.textMuted} />
         </View>
         <Text style={styles.name}>Set up your profile</Text>
         <Text style={styles.subtitle}>
@@ -29,10 +30,10 @@ export default function ProfileScreen() {
 function MenuItem({ icon, label, badge }: { icon: string; label: string; badge?: string }) {
   return (
     <Pressable style={styles.menuItem}>
-      <Ionicons name={icon as any} size={22} color="#1a1a1a" />
+      <Ionicons name={icon as any} size={22} color={colors.secondary} />
       <Text style={styles.menuLabel}>{label}</Text>
       {badge && <Text style={styles.menuBadge}>{badge}</Text>}
-      <Ionicons name="chevron-forward" size={18} color="#ccc" />
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
     </Pressable>
   );
 }
@@ -40,32 +41,34 @@ function MenuItem({ icon, label, badge }: { icon: string; label: string; badge?:
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
   },
   header: {
     alignItems: 'center',
     paddingTop: 20,
     paddingBottom: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.accentSoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   name: {
-    fontSize: 18,
+    fontFamily: fonts.cormorant.medium,
+    fontSize: 22,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     marginTop: 12,
   },
   subtitle: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
     marginTop: 4,
     textAlign: 'center',
     paddingHorizontal: 40,
@@ -82,11 +85,13 @@ const styles = StyleSheet.create({
   },
   menuLabel: {
     flex: 1,
+    fontFamily: fonts.inter.regular,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: colors.textPrimary,
   },
   menuBadge: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#999',
+    color: colors.textMuted,
   },
 });

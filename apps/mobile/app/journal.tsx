@@ -15,6 +15,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { MOOD_TAGS } from '@adore/shared';
 import type { MoodTag, PaginatedResponse } from '@adore/shared';
 import { listOutfits, type OutfitWithItems } from '../lib/api';
+import { colors, fonts } from '../lib/theme';
 
 // ── Constants ─────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ function OutfitCard({ outfit }: { outfit: OutfitWithItems }) {
           />
         ) : (
           <View style={styles.cardImagePlaceholder}>
-            <Ionicons name="shirt-outline" size={32} color="#ccc" />
+            <Ionicons name="shirt-outline" size={32} color={colors.textMuted} />
           </View>
         )}
       </View>
@@ -111,7 +112,7 @@ function OutfitCard({ outfit }: { outfit: OutfitWithItems }) {
                 />
               ) : (
                 <View key={oi.id ?? i} style={[styles.miniThumb, styles.miniThumbPlaceholder]}>
-                  <Ionicons name="shirt-outline" size={12} color="#bbb" />
+                  <Ionicons name="shirt-outline" size={12} color={colors.textMuted} />
                 </View>
               );
             })}
@@ -177,7 +178,7 @@ export default function JournalScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.emptyState}>
-          <Ionicons name="camera-outline" size={64} color="#ccc" />
+          <Ionicons name="camera-outline" size={64} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>No outfits logged yet</Text>
           <Text style={styles.emptySubtitle}>
             Snap a photo of what you're wearing today.{'\n'}
@@ -216,14 +217,14 @@ export default function JournalScreen() {
         }
         ListFooterComponent={
           isFetchingNextPage ? (
-            <ActivityIndicator style={styles.footer} color="#1a1a1a" />
+            <ActivityIndicator style={styles.footer} color={colors.accent} />
           ) : null
         }
         ListEmptyComponent={
           isLoading ? (
             <ActivityIndicator
               size="large"
-              color="#1a1a1a"
+              color={colors.accent}
               style={styles.loading}
             />
           ) : isError ? (
@@ -255,7 +256,7 @@ export default function JournalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
   },
   list: {
     paddingHorizontal: 16,
@@ -265,8 +266,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerCount: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
   },
   loading: {
     marginTop: 80,
@@ -283,14 +285,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontFamily: fonts.cormorant.medium,
+    fontSize: 24,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     marginTop: 16,
   },
   emptySubtitle: {
+    fontFamily: fonts.inter.regular,
     fontSize: 14,
-    color: '#888',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
@@ -298,7 +302,7 @@ const styles = StyleSheet.create({
   captureButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 24,
@@ -306,6 +310,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   captureText: {
+    fontFamily: fonts.inter.medium,
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
@@ -317,8 +322,9 @@ const styles = StyleSheet.create({
     paddingTop: 80,
   },
   errorText: {
+    fontFamily: fonts.inter.regular,
     fontSize: 14,
-    color: '#e53e3e',
+    color: colors.error,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -327,18 +333,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#1a1a1a',
+    borderColor: colors.secondary,
   },
   retryText: {
+    fontFamily: fonts.inter.medium,
     fontSize: 14,
-    color: '#1a1a1a',
+    color: colors.secondary,
     fontWeight: '500',
   },
 
   // Outfit card
   card: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     overflow: 'hidden',
     marginBottom: 12,
@@ -350,7 +357,7 @@ const styles = StyleSheet.create({
   },
   cardImageContainer: {
     width: 110,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.accentSoft,
   },
   cardImage: {
     width: '100%',
@@ -374,31 +381,36 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardDate: {
+    fontFamily: fonts.inter.semibold,
     fontSize: 13,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
   },
   cardMood: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
     textTransform: 'capitalize',
   },
   occasionBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.accentSoft,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     marginBottom: 6,
   },
   occasionBadgeText: {
+    fontFamily: fonts.inter.medium,
     fontSize: 11,
-    color: '#555',
+    color: colors.secondary,
     textTransform: 'capitalize',
+    letterSpacing: 0.5,
   },
   cardItemCount: {
+    fontFamily: fonts.inter.regular,
     fontSize: 12,
-    color: '#999',
+    color: colors.textSecondary,
     marginBottom: 6,
   },
 
@@ -412,7 +424,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.accentSoft,
     overflow: 'hidden',
   },
   miniThumbPlaceholder: {
@@ -422,17 +434,19 @@ const styles = StyleSheet.create({
   miniThumbMore: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e8e8e8',
+    backgroundColor: colors.border,
   },
   miniThumbMoreText: {
+    fontFamily: fonts.inter.semibold,
     fontSize: 10,
-    color: '#888',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
 
   cardNotes: {
+    fontFamily: fonts.inter.regular,
     fontSize: 12,
-    color: '#888',
+    color: colors.textSecondary,
     lineHeight: 16,
   },
 
@@ -444,7 +458,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

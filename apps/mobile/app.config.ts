@@ -12,7 +12,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: './assets/splash.png',
     resizeMode: 'contain',
-    backgroundColor: '#fafafa',
+    backgroundColor: '#FAF8F5',
   },
   assetBundlePatterns: ['**/*'],
   ios: {
@@ -28,11 +28,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#fafafa',
+      backgroundColor: '#FAF8F5',
     },
     package: 'com.adore.app',
   },
-  plugins: ['expo-router'],
+  plugins: ['expo-router', 'expo-font'],
   experiments: {
     typedRoutes: true,
   },

@@ -23,6 +23,7 @@ import {
   scanItem,
   createItem,
 } from '../lib/api';
+import { colors, fonts } from '../lib/theme';
 
 type FlowStep = 'pick' | 'processing' | 'review' | 'saving';
 
@@ -194,7 +195,7 @@ export default function AddItemScreen() {
             style={styles.secondaryButton}
             onPress={() => pickImage('library')}
           >
-            <Ionicons name="images-outline" size={22} color="#1a1a1a" />
+            <Ionicons name="images-outline" size={22} color={colors.secondary} />
             <Text style={styles.secondaryButtonText}>Choose from Library</Text>
           </Pressable>
 
@@ -221,7 +222,7 @@ export default function AddItemScreen() {
           )}
           <ActivityIndicator
             size="large"
-            color="#1a1a1a"
+            color={colors.accent}
             style={styles.processingSpinner}
           />
           <Text style={styles.processingText}>{processingStatus}</Text>
@@ -308,7 +309,7 @@ export default function AddItemScreen() {
               value={name}
               onChangeText={setName}
               placeholder="e.g. Navy Crew Neck T-Shirt"
-              placeholderTextColor="#bbb"
+              placeholderTextColor={colors.textMuted}
             />
 
             <Text style={styles.label}>Brand</Text>
@@ -317,7 +318,7 @@ export default function AddItemScreen() {
               value={brand}
               onChangeText={setBrand}
               placeholder="e.g. Uniqlo"
-              placeholderTextColor="#bbb"
+              placeholderTextColor={colors.textMuted}
             />
 
             <Text style={styles.label}>Notes (optional)</Text>
@@ -326,7 +327,7 @@ export default function AddItemScreen() {
               value={notes}
               onChangeText={setNotes}
               placeholder="Any additional notes..."
-              placeholderTextColor="#bbb"
+              placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={3}
             />
@@ -373,7 +374,7 @@ export default function AddItemScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.processingContainer}>
-        <ActivityIndicator size="large" color="#1a1a1a" />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.processingText}>Saving to wardrobe...</Text>
       </View>
     </View>
@@ -398,7 +399,7 @@ function Chip({ label, color }: { label: string; color?: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
   },
   pickContainer: {
     flex: 1,
@@ -407,14 +408,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: fonts.cormorant.medium,
+    fontSize: 28,
+    fontWeight: '500',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
+    fontFamily: fonts.inter.regular,
     fontSize: 14,
-    color: '#888',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 20,
@@ -423,7 +426,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 28,
@@ -432,6 +435,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryButtonText: {
+    fontFamily: fonts.inter.semibold,
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
@@ -440,7 +444,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderColor: '#1a1a1a',
+    borderColor: colors.secondary,
     borderWidth: 1,
     paddingHorizontal: 28,
     paddingVertical: 14,
@@ -450,7 +454,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   secondaryButtonText: {
-    color: '#1a1a1a',
+    fontFamily: fonts.inter.medium,
+    color: colors.secondary,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -461,7 +466,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   cancelText: {
-    color: '#888',
+    fontFamily: fonts.inter.regular,
+    color: colors.textSecondary,
     fontSize: 14,
   },
 
@@ -482,14 +488,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   processingText: {
+    fontFamily: fonts.inter.medium,
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   processingSubtext: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 
@@ -504,7 +512,7 @@ const styles = StyleSheet.create({
   reviewImageContainer: {
     alignItems: 'center',
     marginVertical: 16,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.accentSoft,
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -518,9 +526,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: fonts.cormorant.medium,
+    fontSize: 18,
+    fontWeight: '500',
+    color: colors.textPrimary,
     marginBottom: 12,
   },
   chipRow: {
@@ -532,15 +541,16 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.accentSoft,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     gap: 6,
   },
   chipText: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#444',
+    color: colors.secondary,
     textTransform: 'capitalize',
   },
   colorDot: {
@@ -548,7 +558,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
   },
 
   // Form
@@ -556,21 +566,23 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   label: {
+    fontFamily: fonts.inter.medium,
     fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 6,
     marginTop: 12,
   },
   input: {
-    backgroundColor: '#fff',
+    fontFamily: fonts.inter.regular,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#1a1a1a',
+    color: colors.textPrimary,
   },
   multilineInput: {
     minHeight: 80,

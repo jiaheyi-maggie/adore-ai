@@ -14,6 +14,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import type { WardrobeItem, PaginatedResponse } from '@adore/shared';
 import { listItems } from '../lib/api';
 import ItemCard from '../components/ItemCard';
+import { colors, fonts } from '../lib/theme';
 
 export default function WardrobeScreen() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function WardrobeScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.emptyState}>
-          <Ionicons name="shirt-outline" size={64} color="#ccc" />
+          <Ionicons name="shirt-outline" size={64} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>Your wardrobe is empty</Text>
           <Text style={styles.emptySubtitle}>
             Add your first item by taking a photo or scanning your closet
@@ -93,14 +94,14 @@ export default function WardrobeScreen() {
         }
         ListFooterComponent={
           isFetchingNextPage ? (
-            <ActivityIndicator style={styles.footer} color="#1a1a1a" />
+            <ActivityIndicator style={styles.footer} color={colors.accent} />
           ) : null
         }
         ListEmptyComponent={
           isLoading ? (
             <ActivityIndicator
               size="large"
-              color="#1a1a1a"
+              color={colors.accent}
               style={styles.loading}
             />
           ) : isError ? (
@@ -132,7 +133,7 @@ export default function WardrobeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
   },
   grid: {
     paddingHorizontal: 16,
@@ -145,8 +146,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   itemCount: {
+    fontFamily: fonts.inter.regular,
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
   },
   loading: {
     marginTop: 80,
@@ -161,14 +163,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontFamily: fonts.cormorant.medium,
+    fontSize: 24,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     marginTop: 16,
   },
   emptySubtitle: {
+    fontFamily: fonts.inter.regular,
     fontSize: 14,
-    color: '#888',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
@@ -176,7 +180,7 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
@@ -184,6 +188,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addButtonText: {
+    fontFamily: fonts.inter.medium,
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
@@ -193,8 +198,9 @@ const styles = StyleSheet.create({
     paddingTop: 80,
   },
   errorText: {
+    fontFamily: fonts.inter.regular,
     fontSize: 14,
-    color: '#e53e3e',
+    color: colors.error,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -203,11 +209,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#1a1a1a',
+    borderColor: colors.secondary,
   },
   retryText: {
+    fontFamily: fonts.inter.medium,
     fontSize: 14,
-    color: '#1a1a1a',
+    color: colors.secondary,
     fontWeight: '500',
   },
   fab: {
@@ -217,7 +224,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
