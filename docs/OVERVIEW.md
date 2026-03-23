@@ -358,7 +358,11 @@ The wardrobe builds itself. Three passive ingestion channels:
 
 2. **Outfit journal (daily snap):** User photographs what they're wearing today. AI decomposes the outfit into individual items and catalogs each one. Over 30 days, this passively catalogs 60-150 items (2-5 per outfit × 30 days).
 
-3. **Manual photo scan (fallback):** Camera with guided capture. Lay item flat, snap it. AI removes background, extracts attributes (color, category, pattern, fabric, brand, formality, season). Batch mode for initial onboarding.
+3. **Manual photo scan (fallback):** Camera with guided capture. Lay item flat, snap it. AI removes background, extracts attributes (color, category, pattern, fabric, brand, formality, season).
+
+4. **Batch Photo Closet Dump:** Lay 8+ items flat on a floor or bed, snap one overhead photo. Gemini 2.5 Flash detects every individual item with bounding boxes and extracts attributes for each. A review carousel lets the user confirm, edit, or skip each detected item before bulk-confirming. ~8 items cataloged in 45 seconds vs. hours of one-by-one scanning. This is the primary cold-start solution — the wardrobe goes from zero to useful in one session. Entry points: empty state button and wardrobe FAB action sheet.
+
+5. **Hanger Flip Rapid Scan:** Zero-disruption scan for hung wardrobes. The camera runs continuously while the user slides hangers. Auto-capture fires every 2.5 seconds with a haptic buzz and counter. Each capture is processed in parallel by Gemini; server-side deduplication merges items that appear across multiple captures (same color, category, and brand = same item). The user reviews and confirms via a carousel after scanning. The wardrobe is built without removing a single item from the closet.
 
 The design principle: **the wardrobe is an output of using the app, not an input required to use it.**
 
@@ -442,6 +446,43 @@ The persistent memory. After 3 months, the stylist knows: your exact wardrobe, y
 - Monthly Taste Graph snapshots: how your style is changing
 - "6 months ago you wore 80% casual. Now you're 50% casual, 40% smart casual. Your goal was this shift — you're ahead of schedule."
 - Anti-suggestions: "You've been drifting toward impulse streetwear purchases. This conflicts with your stated goal of 'more polished.' Want to adjust your goal or refocus?"
+
+### 7.5a Style Shifting (Guided Aesthetic Evolution)
+
+Style Shifting is the answer to "I want to look different, but I don't know where to start." The user selects a target aesthetic from 12 archetype presets, sets an intensity (subtle to full transformation), and the system does the rest.
+
+**The 6-step mobile flow:**
+
+1. **Choose Direction** — Pick a target preset (e.g., Dark Academia, Clean Minimalist). Each preset shows its signature colors, materials, and a style description.
+2. **Set Intensity** — Slider from Subtle (just a nod) to Signature (full aesthetic commitment). Controls how aggressively the wardrobe is reclassified.
+3. **Closet Re-Seen** — Every wardrobe item is classified against the target: target-aligned (keep, use more), bridge (works with some styling), neutral (fine to keep), or phase-out (conflicts with the direction). Tapping any item shows why it was classified that way.
+4. **Bridge Outfits** — Outfit suggestions built exclusively from owned items, showing how to express the target aesthetic with what the user already has. Zero new purchases required.
+5. **Shopping List** — New items ranked by "outfit unlock leverage" — how many new outfits does each purchase enable? Each item includes a happiness score prediction. Powered by Product Matching (Google Shopping via Serper).
+6. **Goal Created** — The shift becomes a persisted StyleGoal with progress tracking, a target milestone date, and weekly nudges.
+
+**The 12 archetype presets:**
+
+| Preset | Description |
+|--------|-------------|
+| Bohemian | Free-spirited layers, earthy tones, global-inspired textures |
+| Clean Minimalist | Pared-back silhouettes, neutral palette, intentional wardrobe |
+| Dark Academia | Scholarly elegance with tweed, earth tones, and literary charm |
+| Coastal Grandmother | Relaxed seaside elegance; linen, muted blues, effortless refinement |
+| Streetwear | Urban cool with oversized silhouettes, sneakers, and graphic edge |
+| Classic Preppy | Collegiate polish with clean lines, plaids, and timeless Americana |
+| Romantic Feminine | Soft silhouettes, florals, and delicate details with a dreamy quality |
+| Edgy Rock | Leather, studs, and attitude with a rebellious energy |
+| Athleisure Chic | Elevated sportswear that goes from gym to brunch effortlessly |
+| Old Money / Quiet Luxury | Understated opulence with impeccable fabrics and zero logos |
+| Scandinavian Minimal | Functional simplicity with cozy textures and a muted Nordic palette |
+| Maximalist Eclectic | Bold patterns, vibrant color mixing, and joyful self-expression |
+
+**Under the hood:**
+- `style-scoring.ts` — Heuristic scoring of each wardrobe item against archetype signature attributes (colors, materials, patterns, formality range, style tags). Gemini maps free-text item descriptions to archetype weights for items with insufficient structured attributes.
+- `archetype-presets.ts` — Preset definitions with `archetypes` weight blends, `signature` attributes, and `favored_categories`.
+- The Shopping List reuses `product-search.ts` (Serper Google Shopping) and `happiness.ts` (happiness score predictions) so purchase recommendations are consistent with the rest of the app.
+
+No competitor has this feature. Most "style evolution" tools either show you aspirational images (Pinterest) or give you a single rigid capsule plan. Style Shifting works with your actual wardrobe, at your actual budget, toward a destination you chose.
 
 ### 7.6 Marketplace Integration (One-Tap Sell)
 
@@ -553,14 +594,18 @@ One 5-second action feeds six systems. This is the atomic habit that makes every
 │  └────────────┘  └────────────┘  └────────────────────────┘ │
 │                                                               │
 │  ┌────────────┐  ┌────────────┐  ┌────────────────────────┐ │
-│  │ Redis      │  │ Claude API │  │  FashionSigLIP         │ │
-│  │ (cache)    │  │ (AI core)  │  │  (fashion embeddings)  │ │
+│  │ Redis      │  │ Gemini 2.5 │  │  FashionSigLIP         │ │
+│  │ (cache)    │  │ Flash (AI) │  │  (fashion embeddings)  │ │
 │  └────────────┘  └────────────┘  └────────────────────────┘ │
 │                                                               │
 │  ┌────────────┐  ┌────────────┐  ┌────────────────────────┐ │
-│  │ rembg      │  │ Gmail API  │  │  Weather/Calendar API  │ │
-│  │ (bg remove)│  │ (receipts) │  │  (context)             │ │
+│  │ BRIA RMBG  │  │ Gmail API  │  │  Weather/Calendar API  │ │
+│  │ (fal.ai)   │  │ (receipts) │  │  (context)             │ │
 │  └────────────┘  └────────────┘  └────────────────────────┘ │
+│                                                               │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Serper API (Google Shopping — product matching)        │ │
+│  └────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -574,13 +619,14 @@ One 5-second action feeds six systems. This is the atomic habit that makes every
 | **Vector Search** | pgvector (HNSW index) | Per-user wardrobe is <1,000 items. pgvector handles this trivially. No need for dedicated vector DB until 1M+ users. |
 | **Image Storage** | Cloudflare R2 (or Supabase Storage) | S3-compatible, CDN-fronted, cheap. |
 | **Cache** | Upstash Redis | Outfit generation cache, style profile cache, weather cache. Serverless Redis. |
-| **AI Core** | Claude API (Anthropic) | Vision for item recognition. Text for outfit generation, styling chat, receipt parsing. Structured output for reliability. |
+| **AI Vision / Item Extraction** | Gemini 2.5 Flash (Google GenAI SDK) | Replaced Claude Vision. Free tier: 500+ requests/day. Handles structured attribute extraction, bounding-box batch detection, and archetype weight mapping. |
+| **AI Text (Stylist, Scoring)** | Claude API (Anthropic) | Persistent stylist memory, happiness scoring, listing generation. Not used for vision. |
 | **Fashion Embeddings** | Marqo-FashionSigLIP | 512-dim fashion-specific embeddings. +57% over FashionCLIP. Powers similarity search and outfit scoring. |
-| **Background Removal** | rembg (self-hosted) | Open-source, free, fast. Cloth-segmentation model included. |
+| **Background Removal** | BRIA RMBG via fal.ai | Replaces self-hosted rembg. Hosted inference, no server management. |
+| **Product Matching** | Serper API (Google Shopping) | Finds actual retail listings for scanned items. Non-blocking: 3s deadline, silently skipped if no key. Powers Style Shifting shopping lists. Set `SERPER_API_KEY` in env. |
 | **Email Parsing** | Gmail API + Claude extraction | OAuth read-only. LLM-based extraction generalizes across retailers without per-retailer templates. |
 | **Weather** | OpenWeather API | Free tier is sufficient. Feels-like temp, UV, precipitation. |
 | **Calendar** | Google Calendar API | Event detection, dress code inference. |
-| **Product Search** | ShopStyle Collective API | Aggregated fashion product catalog with affiliate revenue sharing. |
 | **Background Jobs** | Inngest | Event-driven job processing. Email scanning, embedding generation, nightly analytics. |
 | **Push Notifications** | Expo Push + OneSignal | Occasion reminders, sale alerts, outfit suggestions. |
 
@@ -590,18 +636,21 @@ One 5-second action feeds six systems. This is the atomic habit that makes every
 
 ### Phase 1: LLM-First (MVP)
 
-No custom ML models. Claude handles everything:
+No custom ML models. AI is split: Gemini for vision (free), Claude for text intelligence.
 
 | Task | Model | Cost/Call | Latency |
 |------|-------|----------|---------|
-| Item attribute extraction (from photo) | Claude Sonnet (Vision) | ~$0.005 | 2-3s |
+| Item attribute extraction (from photo) | Gemini 2.5 Flash | Free (500+/day) | 2-3s |
+| Batch item detection (bounding boxes) | Gemini 2.5 Flash | Free (500+/day) | 3-5s |
+| Archetype weight mapping (Style Shifting) | Gemini 2.5 Flash | Free (500+/day) | 1-2s |
 | Outfit generation | Claude Sonnet | ~$0.02 | 3-5s |
 | Stylist conversation | Claude Sonnet | ~$0.01 | 1-3s |
 | Receipt/email parsing | Claude Haiku | ~$0.001 | 1-2s |
 | Listing description generation | Claude Haiku | ~$0.001 | 1-2s |
 | Happiness score calculation | Claude Haiku | ~$0.002 | 1-2s |
+| Product matching (Google Shopping) | Serper API | ~$0.001 | 1-2s |
 
-**Total per-user cost: ~$0.90/month**
+**Total per-user cost: ~$0.50/month** (Gemini free tier eliminates the majority of vision costs)
 
 Why LLM-first: LLMs have surprisingly strong fashion knowledge from training data. They understand color theory, style archetypes, occasion-appropriateness, and brand positioning. For a startup, this is 80% as good as custom ML at 1% of the development cost.
 
@@ -970,14 +1019,24 @@ Things Adore will **never** do:
 ### Phase 1: Foundation (Months 1-3)
 **Goal:** Prove the core loop — scan, style, rate, repeat.
 
-- Wardrobe scanning (photo + AI attribute extraction)
-- AI stylist with persistent memory
-- Outfit generation (owned items, weather + occasion aware)
-- Budget tracker + wish list with happiness score predictions
-- Outfit journal (daily snap)
-- Style quiz onboarding
-- Color analysis from selfie
-- iOS app (Expo/React Native)
+**Built (as of 2026-03-23):**
+- Wardrobe scanning (photo + AI attribute extraction via Gemini 2.5 Flash) ✓
+- Batch Photo Closet Dump (8+ items from one overhead photo) ✓
+- Hanger Flip Rapid Scan (auto-capture every 2.5s, server-side dedup) ✓
+- Product Matching (Google Shopping via Serper API, non-blocking) ✓
+- AI Stylist with persistent memory ✓
+- Outfit Journal (daily snap with AI decomposition) ✓
+- Budget tracker + wish list with happiness score predictions ✓
+- Marketplace listing generation (one-tap sell) ✓
+- Onboarding: visual taste quiz + occasion map + color analysis + revelation screen ✓
+- Style DNA spectrum (multi-archetype profile) ✓
+- Style Radar Chart (6-axis SVG hexagon) ✓
+- Style Shifting (guided aesthetic evolution, 12 presets, 6-step flow) ✓
+- iOS app (Expo/React Native, Expo Go compatible) ✓
+
+**Remaining for Phase 1:**
+- Outfit generation engine (weather + occasion aware, from wardrobe)
+- Email/receipt auto-import (Gmail integration)
 
 ### Phase 2: Intelligence (Months 4-8)
 **Goal:** Make the Happiness Function accurate and the lifecycle complete.
@@ -1028,5 +1087,5 @@ The positioning: **Adore is the first fashion app aligned with YOUR interests, n
 
 ---
 
-*Last updated: 2026-03-21*
-*Status: Pre-development, detailed product specification*
+*Last updated: 2026-03-23*
+*Status: Active development — Phase 1 core features built*

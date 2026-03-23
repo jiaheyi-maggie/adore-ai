@@ -16,6 +16,9 @@
 9. [Emotional Design Patterns](#9-emotional-design-patterns)
 10. [Tech Stack](#10-tech-stack)
 11. [Implementation Priority](#11-implementation-priority)
+12. [Style Radar Chart](#12-style-radar-chart)
+13. [Style Shifting Flow](#13-style-shifting-flow)
+14. [Batch Scanning UX Patterns](#14-batch-scanning-ux-patterns)
 
 ---
 
@@ -203,12 +206,14 @@ LATE NIGHT:
 
 ## 5. Onboarding Flow
 
-### 6 Screens, ~2.5 Minutes
+### 6 Screens, ~2.5 Minutes (as built)
 
 ```
-Splash → Name → 5 Style Swipes → Selfie → First Snap → Revelation
- 0.5s    10s       40s            20s       15s         instant
+Splash → Name → Occasion Map → Visual Taste → Anti-Taste → Selfie → First Snap → Revelation
+ 0.5s    10s        25s             35s           20s         20s       15s          instant
 ```
+
+The original binary "this or that" swipe design was replaced with a research-backed visual taste profiling approach. Binary swipes produce noisy data; visual card selection produces richer archetype signals.
 
 ### Screen 1: Splash (auto-advance, 0.5s)
 Animated "adore" script with gradient shimmer.
@@ -216,29 +221,32 @@ Animated "adore" script with gradient shimmer.
 ### Screen 2: Name
 Single text input, auto-focused. No email, no signup yet. "So I can personalize your experience."
 
-### Screen 3: Style Vibe (5 Binary Swipes)
-"This or that" visual pairs:
-1. Minimal clean vs. Layered maximal (silhouette)
-2. Neutral earth tones vs. Bold saturated color (color temp)
-3. Structured tailored vs. Relaxed flowy (formality)
-4. Classic timeless vs. Trend-forward edgy (novelty)
-5. Investment pieces vs. Variety rotation (spending)
+### Screen 3: Occasion Map (multi-select, 6 cards)
+"What's your life actually like?" — Work / Casual / Social / Fitness / Travel / Special Events. Multi-select; drives `formality_distribution` in the style profile. No wrong answer.
 
-### Screen 4: Selfie for Color Analysis
-Camera with warm-toned border. "Let's find your colors." After capture: 1.5s color extraction animation → "You're a Warm Autumn" with 4-color swatch.
+### Screen 4: Visual Taste (multi-select, 15 tagged style cards)
+"Outfits that feel like YOU." Each card shows a real styled outfit photo with archetype tags behind it (user sees the photo, not the tags). Selecting a card increments archetype weights. Min 2 cards required.
 
-### Screen 5: First Outfit Snap
-"Snap what you're wearing right now." "No judgment, pajamas count."
+### Screen 5: Anti-Taste (optional, 12 polarizing cards)
+"Not your thing." Same card format; avoiding these cards is as signal-rich as selecting favorites. Skippable — presented as optional with "I like all of these" escape hatch.
 
-### Screen 6: Revelation (THE HOOK)
-Shows: Style Archetype + Color Season + Items detected in outfit + "Fun fact: 73% of your outfit is in your best colors."
+### Screen 6: Selfie for Color Analysis
+Camera with warm-toned border. Photo library also supported. "Let's find your colors." After capture: Gemini 2.5 Flash analyzes skin undertone, eye color, natural hair color → 1.5s animation → "You're a Warm Autumn" with 4-color swatch.
+
+### Screen 7: First Outfit Snap
+"Snap what you're wearing right now." Photo library supported. "No judgment, pajamas count."
+
+### Screen 8: Revelation (THE HOOK)
+Shows: Style Archetype + Color Season + Style Radar Chart (6-axis hexagon, the "wow" moment) + items detected in outfit + "Fun fact: 73% of your outfit is in your best colors."
+
+The server computes `style_archetypes` and `formality_distribution` from raw card selections server-side. The revelation screen passes the Style DNA to the API; the radar renders from those archetype weights.
 
 ### Post-Onboarding: NEVER Empty
 - Journal: 1 entry (onboarding outfit)
-- Wardrobe: 3-5 items (auto-decomposed)
+- Wardrobe: 3-5 items (auto-decomposed from first snap)
 - Stylist: Pre-loaded message with 3 outfit ideas
-- Wishlist: 3 curated suggestions from style vibe
-- Profile: Style Vibe badge + Color Season
+- Wishlist: 3 curated suggestions from style profile
+- Profile: Style Radar Card + Color Season + archetype breakdown
 
 ---
 
@@ -348,12 +356,11 @@ Numeric score available on tap → "See why" expands reasoning.
 | **Discovery feed** | Pinterest | Outfit ideas feed with rich visual cards |
 | **Virtual companion growth** | Finch | Style DNA as evolving generative art shape |
 
-### The Style DNA Shape
-An abstract, fluid generative art form that grows with usage:
-- Day 1: vague blob, 2-3 colors
-- Month 1: more defined, distinct segments
-- Month 6: rich, detailed personal emblem
-- Unique to each user. Shareable. Pulses with each new data point.
+### The Style DNA Visualization
+
+The original concept was an abstract generative blob — evocative but illegible. It was replaced with the **Style Radar Chart**: a 6-axis hexagonal radar built in `react-native-svg`. Axes: Structure, Complexity, Risk, Formality, Warmth, Energy. Different users produce visibly different polygon shapes, making the visualization both meaningful and immediately readable.
+
+The radar appears as the "wow moment" in the revelation screen during onboarding, and as a shareable `StyleRadarCard` in the profile screen. The card includes: radar polygon, archetype name, top 3 trait labels, and a share button (react-native-view-shot capture).
 
 ---
 
@@ -372,11 +379,14 @@ npx expo install react-native-reanimated moti
 # High-performance lists
 npx expo install @shopify/flash-list
 
-# Advanced graphics (rings, charts)
-npx expo install @shopify/react-native-skia
+# SVG (Style Radar Chart — replaces Skia for Expo Go compatibility)
+npx expo install react-native-svg
 
 # Gestures + haptics
 npx expo install react-native-gesture-handler expo-haptics
+
+# Camera (used for Hanger Flip auto-capture)
+npx expo install expo-camera
 
 # Better images
 npx expo install expo-image
@@ -384,24 +394,36 @@ npx expo install expo-image
 # Gradients
 npx expo install expo-linear-gradient
 
-# Screenshots (shareable stats)
+# Screenshots (shareable stats, Style Radar Card)
 npx expo install react-native-view-shot
 
 # Confetti (celebrations)
 npx expo install react-native-fast-confetti
 ```
 
+**Note on Skia:** `@shopify/react-native-skia` was installed and then removed. It requires a custom dev client and is incompatible with Expo Go. `react-native-svg` is used instead for the Style Radar Chart and all other vector graphics. Do not re-add Skia without switching to a dev build.
+
 ---
 
 ## 11. Implementation Priority
 
-| Sprint | Focus | Impact |
+| Sprint | Focus | Status |
 |--------|-------|--------|
-| **1** | Color palette swap + fonts + warm empty states | Immediate visual transformation |
-| **2** | "Today" tab with outfit swipe cards + contextual home | Core value loop |
-| **3** | Post-snap reward cards + streak system | Daily engagement |
-| **4** | Onboarding flow (6 screens) | First-time experience |
-| **5** | Monthly Style Wrapped + Style Rings + CPW on cards | Retention layer |
+| **1** | Color palette + fonts + warm empty states | Done |
+| **2** | Outfit Journal with AI decomposition | Done |
+| **3** | AI Stylist with persistent memory | Done |
+| **4** | Wish List + Happiness Function + Budget Tracker | Done |
+| **5** | Marketplace one-tap sell + AI listing generation | Done |
+| **6** | Onboarding (visual taste quiz, occasion map, color analysis) | Done |
+| **7** | Style DNA spectrum + Style Radar Chart | Done |
+| **8** | Batch Photo Closet Dump | Done |
+| **9** | Hanger Flip Rapid Scan | Done |
+| **10** | Product Matching (Google Shopping via Serper) | Done |
+| **11** | Style Shifting engine (12 presets, 6-step flow) | Done |
+| **Next** | "Today" tab — outfit swipe cards + contextual home | Planned |
+| **Next** | Outfit generation engine (weather + occasion aware) | Planned |
+| **Next** | Post-snap reward cards + streak system | Planned |
+| **Next** | Monthly Style Wrapped + Style Rings + CPW on cards | Planned |
 
 ---
 
@@ -418,5 +440,187 @@ npx expo install react-native-fast-confetti
 
 ---
 
+## 12. Style Radar Chart
+
+The Style Radar is the primary visual identity artifact for each user's style profile. It renders as a hexagonal radar using `react-native-svg` (not Skia — must stay Expo Go compatible).
+
+### Six Axes
+
+| Axis | Low End | High End | Derived From |
+|------|---------|----------|-------------|
+| **Structure** | Flowing / relaxed | Tailored / architectural | `minimalist` + `classic` archetype weights; `structured` style tags |
+| **Complexity** | Simple / clean | Layered / detailed | `maximalist` + `bohemian`; `layered`, `textured` tags |
+| **Risk** | Safe / conventional | Daring / experimental | `edgy` + `maximalist`; `statement`, `bold`, `expressive` tags |
+| **Formality** | Casual / laid-back | Polished / formal | `formality_distribution` (average of occasion weights × formality multipliers) |
+| **Warmth** | Cool / minimal | Cozy / inviting | `cozy` + `romantic` + `bohemian`; `earthy`, `soft`, `hygge` tags |
+| **Energy** | Calm / understated | High-energy / vibrant | `athletic` + `edgy`; `sporty`, `graphic`, `urban` tags |
+
+### Rendering Spec
+
+```
+Size: 200×200 (default), 160×160 (compact/card view)
+Center: (100, 100)
+Outer radius: 80px (full score)
+Axes: 6, at 60° intervals, starting at 270° (top = Structure)
+Fill: accent color (#C4956A) at 25% opacity
+Stroke: accent color (#C4956A), 2px
+Axis lines: border color (#EDE8E3), 1px
+Grid rings: 3 rings at 33%, 66%, 100% of outer radius
+Labels: 11pt Inter 500, text-secondary (#8C8279), positioned 12px outside outer radius
+```
+
+The polygon vertices are computed by mapping each axis score (0–1) to a point along the axis ray from center to outer radius, then connecting them in order. Zero scores produce a small central hexagon, not invisible axes.
+
+### Components
+
+- `StyleRadar.tsx` — Pure SVG radar polygon. Props: `scores` (6-item object), `size`, `color`.
+- `StyleRadarCard.tsx` — Shareable card wrapping the radar with archetype name, top 3 trait labels, and a share button. Used in revelation screen and profile tab.
+
+### Score Computation
+
+Scores are computed from `style_archetypes` (normalized weights, sum to 1.0) using weighted combinations per axis. Gemini maps free-text onboarding card selections to archetype weights during the onboarding API call; the weights are stored in `StyleProfile.taste_vector`.
+
+---
+
+## 13. Style Shifting Flow
+
+Style Shifting is a 6-step mobile flow (`style-shift.tsx`) that guides the user from "I want to dress differently" to a persisted `StyleGoal` with a shopping list and bridge outfit suggestions.
+
+### Step Breakdown
+
+```
+Step 1: Choose Direction
+  Grid of 12 archetype preset cards
+  Each card: preset name, description, 3 signature color swatches
+  Single select; selected card gets accent border
+
+Step 2: Set Intensity
+  Labeled slider: Subtle → Moderate → Committed → Signature
+  Below the slider: live preview text ("A nod to the aesthetic"
+  / "Clearly directional" / "Unmistakably [Preset]")
+  Intensity controls how aggressively wardrobe items are classified
+
+Step 3: Closet Re-Seen
+  POST /style-shift/analyze → wardrobe classified into 4 buckets:
+  ● target-aligned   (accent dot, "Keep & wear more")
+  ● bridge           (secondary dot, "Works with styling")
+  ● neutral          (border dot, "Fine as-is")
+  ● phase-out        (muted dot, "Conflicts with this direction")
+  Horizontal scroll of item cards with classification badge
+  Tap any item → bottom sheet explains WHY it was classified that way
+
+Step 4: Bridge Outfits
+  POST /style-shift/bridge-outfits → 3 outfits from owned items only
+  Each outfit card: photo grid, archetype score badge ("72% Dark Academia"),
+  3 styling tip bullets specific to the target aesthetic
+  "No new purchases required" label on this screen
+
+Step 5: Shopping List
+  POST /style-shift/shopping-list → items ranked by outfit-unlock leverage
+  Each item: Serper product match (photo, price, retailer), happiness score
+  prediction, "Unlocks X new outfits" label
+  Budget guard: total estimated spend shown at top
+
+Step 6: Goal Created
+  Summary card: target preset, intensity label, X items to phase out,
+  Y bridge outfits, Z shopping list items
+  CTA: "Start this journey" → writes StyleGoal to DB
+  → returns to profile with new goal card in progress section
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/style-shift/presets` | GET | Returns all 12 `ArchetypePreset` definitions |
+| `/style-shift/analyze` | POST | Classifies wardrobe items against target preset + intensity |
+| `/style-shift/bridge-outfits` | POST | Generates outfits from owned items only |
+| `/style-shift/shopping-list` | POST | Ranked purchase list via product-search.ts + happiness.ts |
+| `/style-shift/create` | POST | Persists the StyleGoal |
+
+### Design Principles for this Flow
+
+- **No purchases required to get value.** Steps 1–4 give immediate value from the current wardrobe. Step 5 is additive.
+- **Classification must be explainable.** Every item classification surfaces its reasoning on tap. Users who disagree can override — that override is a preference signal.
+- **The goal survives the flow.** After Step 6, the user has a living goal. Weekly nudges reference it. The profile screen shows progress. It is not a one-time report.
+
+---
+
+## 14. Batch Scanning UX Patterns
+
+Two new scanning modalities were added for cold-start wardrobe building. Both funnel into the wardrobe grid via a review carousel before any items are committed.
+
+### Batch Photo Closet Dump (batch-scan.tsx)
+
+**Mental model:** Think of it as OCR for clothes. One photo, many items.
+
+```
+Step 1: Instructions
+  Illustration: top-down view of clothes laid flat
+  Checklist: "Lay items flat", "Good lighting", "No overlap",
+             "Up to 20 items per photo"
+  CTA: "Take Photo" or "Choose from Library"
+
+Step 2: Processing
+  Full-screen photo with scan-line animation
+  Counter: "Found X items" ticking up as Gemini responds
+  Each detected item gets a bounding-box overlay drawn in sequence
+
+Step 3: Review Carousel
+  Horizontal swipe through detected items
+  Each card: cropped image (from bounding box), editable fields
+  (name, category, color, brand), with "Skip this item" button
+  Items Gemini was uncertain about show a confidence badge
+
+Step 4: Confirm
+  "Adding X items to your wardrobe"
+  Batch POST to /wardrobe/items/batch-confirm
+  Success: confetti, redirect to wardrobe grid
+```
+
+**Entry points:** Empty state button ("Scan your whole closet at once") + wardrobe FAB → action sheet option.
+
+### Hanger Flip Rapid Scan (hanger-scan.tsx)
+
+**Mental model:** Like a document scanner, but for your closet rod.
+
+```
+Step 1: Instructions
+  Animation: hand sliding hanger to the right, camera auto-capturing
+  Key points: "Keep your closet rod visible", "Slide one hanger at a time",
+              "Camera captures automatically every 2.5 seconds"
+
+Step 2: Scanning (active camera)
+  Live viewfinder
+  Capture counter + haptic buzz on each auto-capture
+  Manual capture button for items that moved too fast
+  "Done scanning" button to stop
+
+Step 3: Processing
+  "Processing X captures..." with progress bar
+  Parallel Gemini calls per capture
+  Server merges duplicate detections (same color + category + brand
+  within the same session = same item, keep highest-confidence capture)
+
+Step 4: Review Carousel
+  Same pattern as Batch Photo (see above)
+
+Step 5: Confirm
+  Same pattern as Batch Photo (see above)
+```
+
+**Entry points:** Same as Batch Photo — empty state + FAB action sheet.
+
+### Shared Review Carousel Conventions
+
+Both flows use the same review carousel pattern. Conventions to maintain:
+- Swipe left/right to navigate, NOT a vertical list
+- "Skip" is always available and non-destructive (skipped items are not added)
+- Editable fields use inline text inputs, not modal sheets — keep the flow moving
+- A "confidence" indicator (checkmark vs. question mark icon) tells the user when Gemini is uncertain
+- The confirm screen always shows the final count before any DB write
+
+---
+
 *Sources: See full agent research transcripts in project task logs.*
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-23*
