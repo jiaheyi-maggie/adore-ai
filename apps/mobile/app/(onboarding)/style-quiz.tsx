@@ -20,13 +20,13 @@ import { colors, fonts, radii, spacing } from '../../lib/theme';
 
 interface OccasionCard {
   id: string;
-  emoji: string;
+  icon: string;
   label: string;
 }
 
 interface StyleCard {
   id: string;
-  emoji: string;
+  icon: string;
   label: string;
   tags: {
     categories: string[];
@@ -40,18 +40,18 @@ interface StyleCard {
 // ── Data ───────────────────────────────────────────────────
 
 const OCCASIONS: OccasionCard[] = [
-  { id: 'casual', emoji: '\u2600\uFE0F', label: 'Casual / daily life' },
-  { id: 'work', emoji: '\uD83D\uDCBC', label: 'Work / office' },
-  { id: 'social', emoji: '\uD83C\uDF89', label: 'Social / going out' },
-  { id: 'active', emoji: '\uD83C\uDFC3', label: 'Active / fitness' },
-  { id: 'creative', emoji: '\uD83C\uDFA8', label: 'Creative / expressive' },
-  { id: 'events', emoji: '\uD83D\uDC57', label: 'Events / dress up' },
+  { id: 'casual', icon: 'sunny-outline', label: 'Casual / daily life' },
+  { id: 'work', icon: 'briefcase-outline', label: 'Work / office' },
+  { id: 'social', icon: 'wine-outline', label: 'Social / going out' },
+  { id: 'active', icon: 'fitness-outline', label: 'Active / fitness' },
+  { id: 'creative', icon: 'color-palette-outline', label: 'Creative / expressive' },
+  { id: 'events', icon: 'sparkles-outline', label: 'Events / dress up' },
 ];
 
 const LIKED_STYLE_CARDS: StyleCard[] = [
   {
     id: 'structured-blazer',
-    emoji: '\uD83E\uDDE5',
+    icon: 'shirt-outline',
     label: 'Structured blazer + slim pants',
     tags: {
       categories: ['outerwear', 'bottoms'],
@@ -63,7 +63,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'flowy-sundress',
-    emoji: '\uD83D\uDC57',
+    icon: 'flower-outline',
     label: 'Flowy sundress + sandals',
     tags: {
       categories: ['dresses', 'shoes'],
@@ -75,7 +75,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'all-black',
-    emoji: '\uD83D\uDDA4',
+    icon: 'moon-outline',
     label: 'All-black everything',
     tags: {
       categories: ['tops', 'bottoms', 'outerwear'],
@@ -87,7 +87,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'earth-tones',
-    emoji: '\uD83C\uDF3F',
+    icon: 'leaf-outline',
     label: 'Earth tones + linen',
     tags: {
       categories: ['tops', 'bottoms'],
@@ -99,7 +99,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'streetwear',
-    emoji: '\u26A1',
+    icon: 'flash-outline',
     label: 'Streetwear + sneakers',
     tags: {
       categories: ['tops', 'shoes', 'outerwear'],
@@ -111,7 +111,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'minimal-jewelry',
-    emoji: '\uD83D\uDC8E',
+    icon: 'diamond-outline',
     label: 'Minimal jewelry + clean lines',
     tags: {
       categories: ['jewelry', 'accessories'],
@@ -123,7 +123,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'bold-prints',
-    emoji: '\uD83C\uDFA8',
+    icon: 'color-palette-outline',
     label: 'Bold prints + color mixing',
     tags: {
       categories: ['tops', 'dresses', 'bottoms'],
@@ -135,7 +135,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'preppy',
-    emoji: '\uD83D\uDC54',
+    icon: 'bowtie-outline',
     label: 'Preppy + polished',
     tags: {
       categories: ['tops', 'bottoms', 'outerwear'],
@@ -147,7 +147,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'romantic-soft',
-    emoji: '\uD83C\uDF38',
+    icon: 'rose-outline',
     label: 'Romantic + soft',
     tags: {
       categories: ['dresses', 'tops'],
@@ -159,7 +159,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'leather-edge',
-    emoji: '\uD83D\uDD25',
+    icon: 'flame-outline',
     label: 'Leather + edge',
     tags: {
       categories: ['outerwear', 'shoes', 'accessories'],
@@ -171,7 +171,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'cozy-knits',
-    emoji: '\u2615',
+    icon: 'cafe-outline',
     label: 'Cozy knits + layers',
     tags: {
       categories: ['tops', 'outerwear'],
@@ -183,7 +183,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'sparkle-statement',
-    emoji: '\u2728',
+    icon: 'sparkles-outline',
     label: 'Sparkle + statement pieces',
     tags: {
       categories: ['jewelry', 'dresses', 'accessories'],
@@ -195,7 +195,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'relaxed-beachy',
-    emoji: '\uD83C\uDFD6\uFE0F',
+    icon: 'umbrella-outline',
     label: 'Relaxed + beachy',
     tags: {
       categories: ['tops', 'bottoms', 'dresses'],
@@ -207,7 +207,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'power-dressing',
-    emoji: '\uD83D\uDC51',
+    icon: 'shield-outline',
     label: 'Power dressing',
     tags: {
       categories: ['outerwear', 'bottoms', 'dresses'],
@@ -219,7 +219,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'vintage-retro',
-    emoji: '\uD83C\uDFAD',
+    icon: 'time-outline',
     label: 'Vintage + retro',
     tags: {
       categories: ['dresses', 'tops', 'accessories'],
@@ -234,7 +234,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
 const DISLIKED_STYLE_CARDS: StyleCard[] = [
   {
     id: 'neon-bright',
-    emoji: '\uD83D\uDE0E',
+    icon: 'bulb-outline',
     label: 'Neon + ultra-bright colors',
     tags: {
       categories: ['tops', 'activewear'],
@@ -246,7 +246,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'head-to-toe-logos',
-    emoji: '\uD83C\uDFF7\uFE0F',
+    icon: 'pricetag-outline',
     label: 'Head-to-toe logos',
     tags: {
       categories: ['tops', 'accessories', 'bags'],
@@ -258,7 +258,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'ultra-baggy',
-    emoji: '\uD83E\uDDCA',
+    icon: 'resize-outline',
     label: 'Ultra-baggy oversized',
     tags: {
       categories: ['tops', 'bottoms'],
@@ -270,7 +270,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'animal-print-heavy',
-    emoji: '\uD83D\uDC06',
+    icon: 'paw-outline',
     label: 'Animal print everything',
     tags: {
       categories: ['tops', 'dresses', 'accessories'],
@@ -282,7 +282,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'frilly-ruffles',
-    emoji: '\uD83C\uDF80',
+    icon: 'ribbon-outline',
     label: 'Lots of frills + ruffles',
     tags: {
       categories: ['dresses', 'tops'],
@@ -294,7 +294,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'athleisure-only',
-    emoji: '\uD83E\uDD3E',
+    icon: 'barbell-outline',
     label: 'Athleisure as everyday wear',
     tags: {
       categories: ['activewear', 'shoes'],
@@ -306,7 +306,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'heavy-distressing',
-    emoji: '\u2702\uFE0F',
+    icon: 'cut-outline',
     label: 'Heavy rips + distressing',
     tags: {
       categories: ['bottoms', 'tops'],
@@ -318,7 +318,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'matching-sets',
-    emoji: '\uD83D\uDC6F',
+    icon: 'people-outline',
     label: 'Matchy-matchy sets',
     tags: {
       categories: ['tops', 'bottoms'],
@@ -330,7 +330,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'chunky-platform',
-    emoji: '\uD83E\uDE74',
+    icon: 'footsteps-outline',
     label: 'Chunky platforms + big soles',
     tags: {
       categories: ['shoes'],
@@ -342,7 +342,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'sheer-cutouts',
-    emoji: '\uD83D\uDD73\uFE0F',
+    icon: 'eye-outline',
     label: 'Sheer fabrics + cutouts',
     tags: {
       categories: ['tops', 'dresses'],
@@ -354,7 +354,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'cargo-utility',
-    emoji: '\uD83E\uDDF0',
+    icon: 'construct-outline',
     label: 'Heavy cargo + utility',
     tags: {
       categories: ['bottoms', 'outerwear'],
@@ -366,7 +366,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'boho-maximal',
-    emoji: '\uD83E\uDEE7',
+    icon: 'flower-outline',
     label: 'Full boho with fringe',
     tags: {
       categories: ['dresses', 'accessories'],
@@ -513,7 +513,7 @@ export default function StyleQuizScreen() {
                     ]}
                     onPress={() => toggleOccasion(card.id)}
                   >
-                    <Text style={styles.cardEmoji}>{card.emoji}</Text>
+                    <Ionicons name={card.icon as any} size={32} color={colors.secondary} />
                     <Text style={styles.occasionLabel}>{card.label}</Text>
                     {selected && (
                       <View style={styles.checkBadge}>
@@ -587,7 +587,7 @@ export default function StyleQuizScreen() {
                     ]}
                     onPress={() => toggleLiked(card.id)}
                   >
-                    <Text style={styles.styleCardEmoji}>{card.emoji}</Text>
+                    <Ionicons name={card.icon as any} size={24} color={colors.secondary} />
                     <Text style={styles.styleCardLabel}>{card.label}</Text>
                     {selected && (
                       <View style={styles.checkBadge}>
@@ -669,7 +669,7 @@ export default function StyleQuizScreen() {
                   ]}
                   onPress={() => toggleDisliked(card.id)}
                 >
-                  <Text style={styles.styleCardEmoji}>{card.emoji}</Text>
+                  <Ionicons name={card.icon as any} size={24} color={colors.secondary} />
                   <Text style={styles.styleCardLabel}>{card.label}</Text>
                   {selected && (
                     <View style={styles.rejectBadge}>
