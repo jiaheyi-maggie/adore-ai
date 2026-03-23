@@ -6,7 +6,7 @@ import type { MarketplaceListing, PaginatedResponse } from '@adore/shared';
 import { listListings, getUserProfile } from '../../lib/api';
 import { colors, fonts, spacing, radii } from '../../lib/theme';
 import { computeStyleDimensions, DEFAULT_DIMENSIONS } from '../../lib/style-dimensions';
-import StyleCard from '../../components/StyleCard';
+import StyleCardNative from '../../components/StyleCardNative';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -50,11 +50,9 @@ export default function ProfileScreen() {
             <Text style={styles.loadingText}>Loading your style...</Text>
           </View>
         ) : hasStyleProfile ? (
-          <StyleCard
+          <StyleCardNative
             dimensions={dimensions}
             userName={userName}
-            seed={user?.id || 'default'}
-            showShareButton={true}
           />
         ) : (
           <View style={styles.emptyAura}>

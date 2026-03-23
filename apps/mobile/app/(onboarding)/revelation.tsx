@@ -17,7 +17,7 @@ import { completeOnboarding } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { COLOR_SEASONS } from '@adore/shared';
 import type { ColorSeason, StyleProfile } from '@adore/shared';
-import StyleAura from '../../components/StyleAura';
+import StyleAuraNative from '../../components/StyleAuraNative';
 import { computeStyleDimensions, DEFAULT_DIMENSIONS } from '../../lib/style-dimensions';
 
 interface DetectedItemSummary {
@@ -323,18 +323,13 @@ export default function RevelationScreen() {
 
         {/* Style Aura Blob — the "wow" moment */}
         <View style={styles.auraContainer}>
-          <StyleAura
-            colorTemp={auraDimensions.colorTemp}
-            saturation={auraDimensions.saturation}
-            structure={auraDimensions.structure}
-            complexity={auraDimensions.complexity}
-            formality={auraDimensions.formality}
-            riskTolerance={auraDimensions.riskTolerance}
+          <StyleAuraNative
             primaryColor={auraDimensions.primaryColor}
             secondaryColor={auraDimensions.secondaryColor}
             accentColor={auraDimensions.accentColor}
+            complexity={auraDimensions.complexity}
+            structure={auraDimensions.structure}
             size={200}
-            seed={user?.id || name}
           />
           <Text style={styles.auraLabel}>{auraDimensions.archetypeName}</Text>
         </View>
