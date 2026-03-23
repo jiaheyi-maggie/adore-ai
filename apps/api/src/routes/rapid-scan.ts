@@ -11,6 +11,11 @@ import {
 } from '@adore/shared';
 import type { AppVariables } from '../lib/types';
 import { authMiddleware } from '../middleware/auth';
+import {
+  buildSearchQuery,
+  searchProductWithDeadline,
+  type ProductSearchResult,
+} from '../lib/product-search';
 
 const rapidScan = new Hono<{ Variables: AppVariables }>();
 rapidScan.use('*', authMiddleware);
@@ -416,7 +421,7 @@ rapidScan.post(
       },
     });
 
-    // Step 7: Return scan + detected items
+    // Step 7: Build response items
     const responseItems = (detections ?? []).map((detection, index) => ({
       detection_id: detection.id as string,
       name: uniqueItems[index].item.name,
@@ -435,6 +440,29 @@ rapidScan.post(
       },
     }));
 
+    // Step 8: Non-blocking product search for each unique item (parallel, 3s deadline each)
+    const productSearchPromises = uniqueItems.map((entry) => {
+      const query = buildSearchQuery({
+        brand: entry.item.brand,
+        colors: entry.item.colors,
+        subcategory: entry.item.subcategory,
+        material: entry.item.material,
+        category: entry.item.category,
+      });
+      if (!query) return Promise.resolve([] as ProductSearchResult[]);
+      return searchProductWithDeadline(query, 3_000);
+    });
+
+    const productResults = await Promise.all(productSearchPromises);
+
+    const itemsWithProducts = responseItems.map((item, index) => ({
+      ...item,
+      product_matches:
+        productResults[index] && productResults[index].length > 0
+          ? productResults[index].slice(0, 3)
+          : undefined,
+    }));
+
     return c.json({
       data: {
         scan_id: scan.id as string,
@@ -442,7 +470,7 @@ rapidScan.post(
         frames_processed: image_urls.length,
         duplicates_removed: detectedItems.length - uniqueItems.length,
         processing_errors: processingErrors.length,
-        items: responseItems,
+        items: itemsWithProducts,
       },
       error: null,
     });

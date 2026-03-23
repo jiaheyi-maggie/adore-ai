@@ -28,6 +28,7 @@ import type {
   ColorSeason,
   User,
   StyleProfile,
+  ProductSearchResult,
 } from '@adore/shared';
 
 // ── Supabase client (for auth only in mobile) ──────────────
@@ -241,6 +242,24 @@ export async function batchConfirm(
       method: 'POST',
       body: JSON.stringify({ scan_id: scanId, items }),
     }
+  );
+  return result.data;
+}
+
+// ── Product Matching API ────────────────────────────────────
+
+export interface FindProductResult {
+  matches: Array<ProductSearchResult & { external_product_id: string | null }>;
+  query: string;
+  stored_ids: string[];
+}
+
+export async function findProduct(
+  itemId: string
+): Promise<FindProductResult> {
+  const result = await apiFetch<ApiResponse<FindProductResult>>(
+    `/wardrobe/items/${itemId}/find-product`,
+    { method: 'POST' }
   );
   return result.data;
 }

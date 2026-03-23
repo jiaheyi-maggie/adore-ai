@@ -1,5 +1,5 @@
 import { View, Text, Image, StyleSheet, Pressable, Dimensions } from 'react-native';
-import type { WardrobeItem } from '@adore/shared';
+import type { WardrobeItem, ProductSearchResult } from '@adore/shared';
 import { colors, fonts, categoryColors } from '../lib/theme';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -9,11 +9,13 @@ const CARD_WIDTH = (SCREEN_WIDTH - CARD_PADDING * 2 - CARD_GAP) / 2;
 
 interface ItemCardProps {
   item: WardrobeItem;
+  /** Cached product match from a prior find-product call */
+  productMatch?: ProductSearchResult | null;
   onPress?: () => void;
   onLongPress?: () => void;
 }
 
-export default function ItemCard({ item, onPress, onLongPress }: ItemCardProps) {
+export default function ItemCard({ item, productMatch, onPress, onLongPress }: ItemCardProps) {
   const imageUrl = item.image_url_clean ?? item.image_url;
   const dotColor = categoryColors[item.category] ?? colors.textMuted;
 
@@ -23,6 +25,11 @@ export default function ItemCard({ item, onPress, onLongPress }: ItemCardProps) 
       ? (item.purchase_price / item.times_worn).toFixed(2)
       : null;
 
+  // Format product match price for display
+  const matchPrice = productMatch
+    ? `$${productMatch.price.toFixed(0)}`
+    : null;
+
   return (
     <Pressable style={styles.card} onPress={onPress} onLongPress={onLongPress} delayLongPress={400}>
       <View style={styles.imageContainer}>
@@ -31,6 +38,12 @@ export default function ItemCard({ item, onPress, onLongPress }: ItemCardProps) 
         ) : (
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>No Image</Text>
+          </View>
+        )}
+        {/* Price badge overlay — shown when a product match exists */}
+        {matchPrice && (
+          <View style={styles.priceBadge}>
+            <Text style={styles.priceBadgeText}>{matchPrice}</Text>
           </View>
         )}
       </View>
@@ -47,6 +60,14 @@ export default function ItemCard({ item, onPress, onLongPress }: ItemCardProps) 
             <Text style={styles.cpw}>${costPerWear}/wear</Text>
           )}
         </View>
+        {/* Found online indicator */}
+        {productMatch && (
+          <View style={styles.productMatchRow}>
+            <Text style={styles.productMatchText} numberOfLines={1}>
+              Found at {productMatch.retailer}
+            </Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -83,6 +104,21 @@ const styles = StyleSheet.create({
     fontFamily: fonts.inter.regular,
     fontSize: 12,
     color: colors.textMuted,
+  },
+  priceBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  priceBadgeText: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   info: {
     padding: 10,
@@ -122,5 +158,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: colors.accent,
+  },
+  productMatchRow: {
+    marginTop: 4,
+  },
+  productMatchText: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 10,
+    color: colors.success,
   },
 });

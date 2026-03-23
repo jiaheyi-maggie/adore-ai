@@ -12,6 +12,11 @@ import {
 } from '@adore/shared';
 import type { AppVariables } from '../lib/types';
 import { authMiddleware } from '../middleware/auth';
+import {
+  buildSearchQuery,
+  searchProductWithDeadline,
+  type ProductSearchResult,
+} from '../lib/product-search';
 
 const batchScan = new Hono<{ Variables: AppVariables }>();
 batchScan.use('*', authMiddleware);
@@ -297,7 +302,7 @@ batchScan.post('/items/batch-scan', zValidator('json', batchScanSchema), async (
     },
   });
 
-  // Step 5: Return scan + detections
+  // Step 5: Build response items
   const responseItems = (detections ?? []).map((detection, index) => ({
     detection_id: detection.id,
     name: detectedItems[index].name,
@@ -316,11 +321,37 @@ batchScan.post('/items/batch-scan', zValidator('json', batchScanSchema), async (
     },
   }));
 
+  // Step 6: Non-blocking product search for each detected item.
+  // Fire all searches in parallel with a 3s deadline per item.
+  // If SERPER_API_KEY is not set, all resolve to empty arrays immediately.
+  const productSearchPromises = detectedItems.map((item) => {
+    const query = buildSearchQuery({
+      brand: item.brand,
+      colors: item.colors,
+      subcategory: item.subcategory,
+      material: item.material,
+      category: item.category,
+    });
+    if (!query) return Promise.resolve([] as ProductSearchResult[]);
+    return searchProductWithDeadline(query, 3_000);
+  });
+
+  const productResults = await Promise.all(productSearchPromises);
+
+  // Attach product matches to each response item (top 3 per item)
+  const itemsWithProducts = responseItems.map((item, index) => ({
+    ...item,
+    product_matches:
+      productResults[index] && productResults[index].length > 0
+        ? productResults[index].slice(0, 3)
+        : undefined,
+  }));
+
   return c.json({
     data: {
       scan_id: scan.id,
       items_detected: detectedItems.length,
-      items: responseItems,
+      items: itemsWithProducts,
     },
     error: null,
   });

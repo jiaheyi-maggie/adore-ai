@@ -12,6 +12,11 @@ import {
 } from '@adore/shared';
 import type { AppVariables } from '../lib/types';
 import { authMiddleware } from '../middleware/auth';
+import {
+  buildSearchQuery,
+  searchProductWithDeadline,
+  type ProductSearchResult,
+} from '../lib/product-search';
 
 const scan = new Hono<{ Variables: AppVariables }>();
 scan.use('*', authMiddleware);
@@ -134,7 +139,27 @@ scan.post('/items/scan', zValidator('json', scanSchema), async (c) => {
     },
   });
 
-  return c.json({ data: attributes, error: null });
+  // Non-blocking product search — race against 3s deadline.
+  // If it completes in time, include results. Otherwise return without them.
+  let productMatches: ProductSearchResult[] = [];
+  const searchQuery = buildSearchQuery({
+    brand: attributes.brand,
+    colors: attributes.colors,
+    subcategory: attributes.subcategory,
+    material: attributes.material,
+    category: attributes.category,
+  });
+
+  if (searchQuery) {
+    productMatches = await searchProductWithDeadline(searchQuery, 3_000);
+  }
+
+  return c.json({
+    data: attributes,
+    error: null,
+    product_matches: productMatches.length > 0 ? productMatches.slice(0, 3) : undefined,
+    product_search_query: searchQuery || undefined,
+  });
 });
 
 export default scan;

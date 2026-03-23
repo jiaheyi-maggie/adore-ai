@@ -382,6 +382,19 @@ export interface ExternalProduct {
   created_at: ISOTimestamp;
 }
 
+/** Result from Google Shopping product search via Serper API */
+export interface ProductSearchResult {
+  name: string;
+  price: number;
+  currency: string;
+  source_url: string;
+  image_url: string;
+  retailer: string;
+  brand: string | null;
+  /** Set after storing in external_products table */
+  external_product_id?: string | null;
+}
+
 export interface StyleGoal {
   id: string;
   user_id: string;
