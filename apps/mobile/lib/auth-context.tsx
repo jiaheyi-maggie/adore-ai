@@ -17,13 +17,19 @@ interface AuthState {
   onboardingCompleted: boolean | null;
 }
 
+interface SignUpResult {
+  error: string | null;
+  /** True when the account was created but email confirmation is required before sign-in */
+  needsEmailConfirmation: boolean;
+}
+
 interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
     password: string,
     name: string,
-  ) => Promise<{ error: string | null }>;
+  ) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   refreshOnboardingStatus: () => Promise<void>;
 }
@@ -103,15 +109,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = useCallback(
-    async (email: string, password: string, name: string) => {
-      const { error } = await supabase.auth.signUp({
+    async (email: string, password: string, name: string): Promise<SignUpResult> => {
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { name },
         },
       });
-      return { error: error?.message ?? null };
+
+      if (error) {
+        return { error: error.message, needsEmailConfirmation: false };
+      }
+
+      // Supabase returns a user but no session when email confirmation is required.
+      // The user exists but can't sign in until they click the confirmation link.
+      const needsEmailConfirmation = !!data.user && !data.session;
+      return { error: null, needsEmailConfirmation };
     },
     [],
   );

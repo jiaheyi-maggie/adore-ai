@@ -39,13 +39,29 @@ export default function SignUpScreen() {
     }
 
     setIsLoading(true);
-    const { error } = await signUp(email.trim().toLowerCase(), password, name.trim());
+    const { error, needsEmailConfirmation } = await signUp(
+      email.trim().toLowerCase(),
+      password,
+      name.trim(),
+    );
     setIsLoading(false);
 
     if (error) {
       Alert.alert('Sign up failed', error);
+      return;
     }
-    // On success, auth state change triggers navigation automatically
+
+    if (needsEmailConfirmation) {
+      Alert.alert(
+        'Check your email',
+        'We sent a confirmation link to your email address. Please confirm your account, then sign in.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      );
+      return;
+    }
+
+    // If email confirmation is disabled, the session is established immediately
+    // and onAuthStateChange will trigger navigation automatically.
   };
 
   return (
