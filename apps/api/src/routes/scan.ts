@@ -155,10 +155,12 @@ scan.post('/items/scan', zValidator('json', scanSchema), async (c) => {
   }
 
   return c.json({
-    data: attributes,
+    data: {
+      ...attributes,
+      product_matches: productMatches.length > 0 ? productMatches.slice(0, 3) : undefined,
+      product_search_query: searchQuery || undefined,
+    },
     error: null,
-    product_matches: productMatches.length > 0 ? productMatches.slice(0, 3) : undefined,
-    product_search_query: searchQuery || undefined,
   });
 });
 

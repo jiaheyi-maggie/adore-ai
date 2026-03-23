@@ -440,20 +440,31 @@ rapidScan.post(
       },
     }));
 
-    // Step 8: Non-blocking product search for each unique item (parallel, 3s deadline each)
-    const productSearchPromises = uniqueItems.map((entry) => {
-      const query = buildSearchQuery({
-        brand: entry.item.brand,
-        colors: entry.item.colors,
-        subcategory: entry.item.subcategory,
-        material: entry.item.material,
-        category: entry.item.category,
-      });
-      if (!query) return Promise.resolve([] as ProductSearchResult[]);
-      return searchProductWithDeadline(query, 3_000);
-    });
+    // Step 8: Non-blocking product search for each unique item.
+    // Batched to avoid overwhelming Serper API with concurrent requests.
+    const SEARCH_BATCH_SIZE = 5;
+    const productResults: ProductSearchResult[][] = new Array(uniqueItems.length).fill([]);
 
-    const productResults = await Promise.all(productSearchPromises);
+    for (let i = 0; i < uniqueItems.length; i += SEARCH_BATCH_SIZE) {
+      const batch = uniqueItems.slice(i, i + SEARCH_BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((entry) => {
+          const query = buildSearchQuery({
+            brand: entry.item.brand,
+            colors: entry.item.colors,
+            subcategory: entry.item.subcategory,
+            material: entry.item.material,
+            category: entry.item.category,
+          });
+          if (!query) return Promise.resolve([] as ProductSearchResult[]);
+          return searchProductWithDeadline(query, 3_000);
+        })
+      );
+      batchResults.forEach((result, batchIndex) => {
+        productResults[i + batchIndex] =
+          result.status === 'fulfilled' ? result.value : [];
+      });
+    }
 
     const itemsWithProducts = responseItems.map((item, index) => ({
       ...item,

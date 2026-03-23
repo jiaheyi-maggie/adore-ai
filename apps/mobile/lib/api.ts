@@ -198,6 +198,7 @@ export interface BatchScanItem {
   name: string;
   box_2d: [number, number, number, number];
   attributes: ItemAttributes;
+  product_matches?: ProductSearchResult[];
 }
 
 export interface BatchScanResult {
@@ -271,6 +272,7 @@ export interface RapidScanItem {
   name: string;
   image_url: string;
   attributes: ItemAttributes;
+  product_matches?: ProductSearchResult[];
 }
 
 export interface RapidScanResult {

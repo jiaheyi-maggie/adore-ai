@@ -1,16 +1,7 @@
+import { type ProductSearchResult } from '@adore/shared';
 import { getAdminClient } from './supabase';
 
-// ── Types ────────────────────────────────────────────────────
-
-export interface ProductSearchResult {
-  name: string;
-  price: number;
-  currency: string;
-  source_url: string;
-  image_url: string;
-  retailer: string;
-  brand: string | null;
-}
+export type { ProductSearchResult };
 
 /** Raw Serper Google Shopping API response shape */
 interface SerperShoppingResponse {
@@ -82,55 +73,51 @@ const MAX_RESULTS = 5;
  * - If API call fails, returns empty array (logs error, no crash).
  * - 5-second timeout on all requests.
  */
-export async function searchProduct(query: string): Promise<ProductSearchResult[]> {
+export async function searchProduct(
+  query: string,
+  signal?: AbortSignal
+): Promise<ProductSearchResult[]> {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey) return [];
 
   if (!query.trim()) return [];
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SERPER_TIMEOUT_MS);
+    const response = await fetch('https://google.serper.dev/shopping', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: query,
+        num: MAX_RESULTS,
+      }),
+      signal: signal ?? AbortSignal.timeout(SERPER_TIMEOUT_MS),
+    });
 
-    try {
-      const response = await fetch('https://google.serper.dev/shopping', {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          q: query,
-          num: MAX_RESULTS,
-        }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        console.error(
-          `[product-search] Serper API error: ${response.status} ${response.statusText}`
-        );
-        return [];
-      }
-
-      const data = (await response.json()) as SerperShoppingResponse;
-
-      if (!data.shopping || data.shopping.length === 0) {
-        return [];
-      }
-
-      return data.shopping.map((item) => ({
-        name: item.title,
-        price: item.price,
-        currency: item.currency ?? 'USD',
-        source_url: item.link,
-        image_url: item.imageUrl ?? '',
-        retailer: item.source,
-        brand: null, // Serper doesn't return brand separately; it's in the title
-      }));
-    } finally {
-      clearTimeout(timeout);
+    if (!response.ok) {
+      console.error(
+        `[product-search] Serper API error: ${response.status} ${response.statusText}`
+      );
+      return [];
     }
+
+    const data = (await response.json()) as SerperShoppingResponse;
+
+    if (!data.shopping || data.shopping.length === 0) {
+      return [];
+    }
+
+    return data.shopping.map((item) => ({
+      name: item.title,
+      price: item.price,
+      currency: item.currency ?? 'USD',
+      source_url: item.link,
+      image_url: item.imageUrl ?? '',
+      retailer: item.source,
+      brand: null, // Serper doesn't return brand separately; it's in the title
+    }));
   } catch (err) {
     // AbortError = timeout, everything else = unexpected failure
     const isTimeout = err instanceof Error && err.name === 'AbortError';
@@ -222,15 +209,13 @@ export async function searchProductWithDeadline(
   query: string,
   deadlineMs: number = 3_000
 ): Promise<ProductSearchResult[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), deadlineMs);
   try {
-    const result = await Promise.race([
-      searchProduct(query),
-      new Promise<ProductSearchResult[]>((resolve) =>
-        setTimeout(() => resolve([]), deadlineMs)
-      ),
-    ]);
-    return result;
+    return await searchProduct(query, controller.signal);
   } catch {
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }

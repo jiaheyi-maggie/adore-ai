@@ -322,21 +322,31 @@ batchScan.post('/items/batch-scan', zValidator('json', batchScanSchema), async (
   }));
 
   // Step 6: Non-blocking product search for each detected item.
-  // Fire all searches in parallel with a 3s deadline per item.
+  // Batched to avoid overwhelming Serper API with concurrent requests.
   // If SERPER_API_KEY is not set, all resolve to empty arrays immediately.
-  const productSearchPromises = detectedItems.map((item) => {
-    const query = buildSearchQuery({
-      brand: item.brand,
-      colors: item.colors,
-      subcategory: item.subcategory,
-      material: item.material,
-      category: item.category,
-    });
-    if (!query) return Promise.resolve([] as ProductSearchResult[]);
-    return searchProductWithDeadline(query, 3_000);
-  });
+  const SEARCH_BATCH_SIZE = 5;
+  const productResults: ProductSearchResult[][] = new Array(detectedItems.length).fill([]);
 
-  const productResults = await Promise.all(productSearchPromises);
+  for (let i = 0; i < detectedItems.length; i += SEARCH_BATCH_SIZE) {
+    const batch = detectedItems.slice(i, i + SEARCH_BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batch.map((item) => {
+        const query = buildSearchQuery({
+          brand: item.brand,
+          colors: item.colors,
+          subcategory: item.subcategory,
+          material: item.material,
+          category: item.category,
+        });
+        if (!query) return Promise.resolve([] as ProductSearchResult[]);
+        return searchProductWithDeadline(query, 3_000);
+      })
+    );
+    batchResults.forEach((result, batchIndex) => {
+      productResults[i + batchIndex] =
+        result.status === 'fulfilled' ? result.value : [];
+    });
+  }
 
   // Attach product matches to each response item (top 3 per item)
   const itemsWithProducts = responseItems.map((item, index) => ({
