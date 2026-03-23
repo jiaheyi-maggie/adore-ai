@@ -112,6 +112,13 @@ export default function TabsLayout() {
           title: 'Batch Scan',
         }}
       />
+      <Tabs.Screen
+        name="hanger-scan"
+        options={{
+          href: null,
+          title: 'Closet Scan',
+        }}
+      />
     </Tabs>
   );
 }

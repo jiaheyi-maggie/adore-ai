@@ -245,6 +245,64 @@ export async function batchConfirm(
   return result.data;
 }
 
+// ── Rapid Scan (Hanger Flip) API ────────────────────────────
+
+export interface RapidScanItem {
+  detection_id: string;
+  name: string;
+  image_url: string;
+  attributes: ItemAttributes;
+}
+
+export interface RapidScanResult {
+  scan_id: string;
+  items_detected: number;
+  frames_processed: number;
+  duplicates_removed: number;
+  processing_errors: number;
+  items: RapidScanItem[];
+}
+
+export async function rapidScan(
+  imageUrls: string[]
+): Promise<RapidScanResult> {
+  const result = await apiFetch<ApiResponse<RapidScanResult>>(
+    '/wardrobe/items/rapid-scan',
+    {
+      method: 'POST',
+      body: JSON.stringify({ image_urls: imageUrls }),
+    }
+  );
+  return result.data;
+}
+
+export interface RapidConfirmItem {
+  detection_id: string;
+  confirmed: boolean;
+  attributes_override?: Partial<ItemAttributes>;
+  name?: string;
+}
+
+export interface RapidConfirmResult {
+  created_items: WardrobeItem[];
+  confirmed_count: number;
+  rejected_count: number;
+}
+
+export async function rapidConfirm(
+  scanId: string,
+  items: RapidConfirmItem[]
+): Promise<RapidConfirmResult> {
+  const result = await apiFetch<ApiResponse<RapidConfirmResult>>(
+    '/wardrobe/items/rapid-confirm',
+    {
+      method: 'POST',
+      body: JSON.stringify({ scan_id: scanId, items }),
+    }
+  );
+  return result.data;
+}
+
 // ── Outfits API ─────────────────────────────────────────────
 
 /** Outfit with joined items from the API */

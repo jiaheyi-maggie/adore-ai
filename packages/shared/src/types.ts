@@ -115,6 +115,7 @@ export const ITEM_SOURCES = [
   'batch-photo',
   'retailer-import',
   'social-import',
+  'hanger-flip',
 ] as const;
 export type ItemSource = (typeof ITEM_SOURCES)[number];
 
@@ -450,6 +451,7 @@ export const SCAN_METHODS = [
   'email-import',
   'retailer-import',
   'social-import',
+  'hanger-flip',
 ] as const;
 export type ScanMethod = (typeof SCAN_METHODS)[number];
 

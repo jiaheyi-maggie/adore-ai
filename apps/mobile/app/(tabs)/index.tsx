@@ -107,7 +107,14 @@ export default function WardrobeScreen() {
             onPress={() => router.push('/batch-scan')}
           >
             <Ionicons name="scan-outline" size={20} color={colors.secondary} />
-            <Text style={styles.batchScanButtonText}>Scan Closet</Text>
+            <Text style={styles.batchScanButtonText}>Batch Scan</Text>
+          </Pressable>
+          <Pressable
+            style={styles.closetScanButton}
+            onPress={() => router.push('/hanger-scan')}
+          >
+            <Ionicons name="albums-outline" size={20} color={colors.secondary} />
+            <Text style={styles.batchScanButtonText}>Closet Scan</Text>
           </Pressable>
         </View>
       </View>
@@ -171,13 +178,14 @@ export default function WardrobeScreen() {
             if (Platform.OS === 'ios') {
               ActionSheetIOS.showActionSheetWithOptions(
                 {
-                  options: ['Cancel', 'Add Single Item', 'Batch Scan'],
+                  options: ['Cancel', 'Add Single Item', 'Batch Scan', 'Closet Scan'],
                   cancelButtonIndex: 0,
                   title: 'Add to Wardrobe',
                 },
                 (buttonIndex) => {
                   if (buttonIndex === 1) router.push('/add-item');
                   if (buttonIndex === 2) router.push('/batch-scan');
+                  if (buttonIndex === 3) router.push('/hanger-scan');
                 }
               );
             } else {
@@ -185,6 +193,7 @@ export default function WardrobeScreen() {
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Add Single Item', onPress: () => router.push('/add-item') },
                 { text: 'Batch Scan', onPress: () => router.push('/batch-scan') },
+                { text: 'Closet Scan', onPress: () => router.push('/hanger-scan') },
               ]);
             }
           }}
@@ -275,6 +284,17 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: 16,
     fontWeight: '500',
+  },
+  closetScanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderColor: colors.secondary,
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 12,
+    gap: 8,
   },
   errorState: {
     alignItems: 'center',
