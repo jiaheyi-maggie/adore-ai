@@ -73,19 +73,19 @@ const batchScanSchema = z.object({
 
 const batchDetectionSchema = z.object({
   box_2d: z.array(z.number()).length(4),
-  category: z.string(),
+  category: z.enum(ITEM_CATEGORIES).catch('accessories'),
   subcategory: z.string().nullable().optional().default(null),
   colors: z.object({
     dominant: z.string(),
     secondary: z.array(z.string()).default([]),
     hex_codes: z.array(z.string()).default([]),
   }),
-  pattern: z.string().default('solid'),
-  material: z.string().nullable().optional().default(null),
+  pattern: z.enum(PATTERNS).catch('solid'),
+  material: z.enum(MATERIALS).nullable().catch(null),
   brand: z.string().nullable().optional().default(null),
   formality_level: z.number().int().min(1).max(5).default(3),
-  seasons: z.array(z.string()).default([]),
-  condition: z.string().default('good'),
+  seasons: z.array(z.enum(SEASONS)).catch([]),
+  condition: z.enum(ITEM_CONDITIONS).catch('good'),
   style_tags: z.array(z.string()).default([]),
   name: z.string().default('Clothing item'),
 });
@@ -336,7 +336,7 @@ batchScan.post('/items/batch-confirm', zValidator('json', batchConfirmSchema), a
   // Verify scan belongs to user
   const { data: scan, error: scanError } = await supabase
     .from('wardrobe_scans')
-    .select('id, user_id, source_media_url')
+    .select('id, user_id, status, source_media_url')
     .eq('id', scan_id)
     .single();
 
@@ -344,6 +344,20 @@ batchScan.post('/items/batch-confirm', zValidator('json', batchConfirmSchema), a
     return c.json(
       { data: null, error: { code: 'NOT_FOUND', message: 'Scan not found' } },
       404
+    );
+  }
+
+  if (scan.user_id !== userId) {
+    return c.json(
+      { data: null, error: { code: 'FORBIDDEN', message: 'Scan does not belong to this user' } },
+      403
+    );
+  }
+
+  if (scan.status !== 'review') {
+    return c.json(
+      { data: null, error: { code: 'ALREADY_PROCESSED', message: 'This scan has already been processed' } },
+      409
     );
   }
 
@@ -400,6 +414,7 @@ batchScan.post('/items/batch-confirm', zValidator('json', batchConfirmSchema), a
           seasons: (attrs.seasons as string[]) ?? [],
           condition: (attrs.condition as string) ?? 'good',
           image_url: scan.source_media_url,
+          notes: `batch-scan:${JSON.stringify(detection.auto_attributes?.box_2d || [])}`,
           source: 'batch-photo' as const,
           status: 'active' as const,
         })

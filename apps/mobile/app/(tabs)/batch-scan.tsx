@@ -223,10 +223,10 @@ export default function BatchScanScreen() {
       // CSS clip-path natively, we'll use the full image and overlay a
       // highlight indicator showing the approximate region.
       return {
-        top: `${(box[0] / 1000) * 100}%`,
-        left: `${(box[1] / 1000) * 100}%`,
-        width: `${((box[2] - box[0]) / 1000) * 100}%`,
-        height: `${((box[3] - box[1]) / 1000) * 100}%`,
+        top: (box[0] / 1000) * 200,
+        left: (box[1] / 1000) * CARD_WIDTH,
+        width: ((box[3] - box[1]) / 1000) * CARD_WIDTH,
+        height: ((box[2] - box[0]) / 1000) * 200,
       };
     },
     []
@@ -354,10 +354,10 @@ export default function BatchScanScreen() {
                   style={[
                     styles.boundingBox,
                     {
-                      top: `${(item.box_2d[0] / 1000) * 100}%` as unknown as number,
-                      left: `${(item.box_2d[1] / 1000) * 100}%` as unknown as number,
-                      width: `${((item.box_2d[2] - item.box_2d[0]) / 1000) * 100}%` as unknown as number,
-                      height: `${((item.box_2d[3] - item.box_2d[1]) / 1000) * 100}%` as unknown as number,
+                      top: (item.box_2d[0] / 1000) * 200,
+                      left: (item.box_2d[1] / 1000) * CARD_WIDTH,
+                      width: ((item.box_2d[3] - item.box_2d[1]) / 1000) * CARD_WIDTH,
+                      height: ((item.box_2d[2] - item.box_2d[0]) / 1000) * 200,
                     },
                   ]}
                 />
