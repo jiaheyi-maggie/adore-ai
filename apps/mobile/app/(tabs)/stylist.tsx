@@ -13,12 +13,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts } from '../../lib/theme';
 import {
   sendMessage,
   getMessages,
   type ChatResponse,
-} from '../lib/api';
+} from '../../lib/api';
 import type { Message, ApiResponse } from '@adore/shared';
 
 // ── Typing Dots Animation ──────────────────────────────────

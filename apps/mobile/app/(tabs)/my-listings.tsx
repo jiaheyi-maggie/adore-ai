@@ -18,8 +18,8 @@ import {
   listListings,
   markListingSold,
   cancelListing,
-} from '../lib/api';
-import { colors, fonts, radii, spacing } from '../lib/theme';
+} from '../../lib/api';
+import { colors, fonts, radii, spacing } from '../../lib/theme';
 
 type TabFilter = 'active' | 'sold' | 'all';
 

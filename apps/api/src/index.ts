@@ -10,6 +10,7 @@ import outfitRoutes from './routes/outfits';
 import stylistRoutes from './routes/stylist';
 import marketplaceRoutes from './routes/marketplace';
 import wishlistRoutes from './routes/wishlist';
+import onboardingRoutes from './routes/onboarding';
 
 const app = new Hono();
 
@@ -46,6 +47,7 @@ app.route('/outfits', outfitRoutes);
 app.route('/stylist', stylistRoutes);
 app.route('/marketplace', marketplaceRoutes);
 app.route('/wishlist', wishlistRoutes);
+app.route('/auth', onboardingRoutes);
 
 const port = Number(process.env.PORT) || 3000;
 

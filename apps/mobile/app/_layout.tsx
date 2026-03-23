@@ -1,7 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -20,10 +19,51 @@ import {
   DMMono_500Medium,
 } from '@expo-google-fonts/dm-mono';
 import { queryClient } from '../lib/query-client';
-import { colors, fonts } from '../lib/theme';
+import { colors } from '../lib/theme';
+import { AuthProvider, useAuth } from '../lib/auth-context';
 
 // Keep the splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
+
+function RootNavigator() {
+  const { user, isLoading, onboardingCompleted } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const inOnboardingGroup = segments[0] === '(onboarding)';
+
+    if (!user) {
+      // Not authenticated -> go to auth
+      if (!inAuthGroup) {
+        router.replace('/sign-in');
+      }
+    } else if (!onboardingCompleted) {
+      // Authenticated but haven't completed onboarding
+      if (!inOnboardingGroup) {
+        router.replace('/welcome');
+      }
+    } else {
+      // Authenticated and onboarding complete -> go to main app
+      if (inAuthGroup || inOnboardingGroup) {
+        router.replace('/');
+      }
+    }
+  }, [user, isLoading, onboardingCompleted, segments]);
+
+  if (isLoading) {
+    return (
+      <View style={loadingStyles.container}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
+  return <Slot />;
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -53,114 +93,11 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        <Tabs
-          screenOptions={{
-            tabBarActiveTintColor: colors.accent,
-            tabBarInactiveTintColor: colors.textSecondary,
-            tabBarStyle: {
-              backgroundColor: colors.background,
-              borderTopColor: colors.border,
-            },
-            headerStyle: {
-              backgroundColor: colors.background,
-            },
-            headerTitleStyle: {
-              fontFamily: fonts.cormorant.medium,
-              fontSize: 20,
-              fontWeight: '500',
-              color: colors.textPrimary,
-            },
-            headerShadowVisible: false,
-          }}
-        >
-          <Tabs.Screen
-            name="index"
-            options={{
-              title: 'Wardrobe',
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="shirt-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="journal"
-            options={{
-              title: 'Journal',
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="camera-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="stylist"
-            options={{
-              title: 'Stylist',
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="sparkles-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="wishlist"
-            options={{
-              title: 'Wishlist',
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="heart-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="profile"
-            options={{
-              title: 'Profile',
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="person-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          {/* Hide add-item from tabs — it's a modal screen accessed via navigation */}
-          <Tabs.Screen
-            name="add-item"
-            options={{
-              href: null,
-              title: 'Add Item',
-            }}
-          />
-          {/* Hide log-outfit from tabs — it's a modal screen accessed via journal */}
-          <Tabs.Screen
-            name="log-outfit"
-            options={{
-              href: null,
-              title: 'Log Outfit',
-            }}
-          />
-          {/* Hide sell-item from tabs — accessed via wardrobe long-press */}
-          <Tabs.Screen
-            name="sell-item"
-            options={{
-              href: null,
-              title: 'Sell Item',
-            }}
-          />
-          {/* Hide my-listings from tabs — accessed via profile */}
-          <Tabs.Screen
-            name="my-listings"
-            options={{
-              href: null,
-              title: 'My Listings',
-            }}
-          />
-          {/* Hide add-wishlist-item from tabs — modal from wishlist */}
-          <Tabs.Screen
-            name="add-wishlist-item"
-            options={{
-              href: null,
-              title: 'Add to Wishlist',
-            }}
-          />
-        </Tabs>
-      </View>
+      <AuthProvider>
+        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+          <RootNavigator />
+        </View>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

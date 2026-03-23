@@ -25,6 +25,9 @@ import type {
   WishlistPriority,
   HappinessScore,
   BudgetPeriod,
+  ColorSeason,
+  User,
+  StyleProfile,
 } from '@adore/shared';
 
 // ── Supabase client (for auth only in mobile) ──────────────
@@ -609,6 +612,57 @@ export async function updateBudget(
     {
       method: 'PATCH',
       body: JSON.stringify({ budget_amount: budgetAmount }),
+    }
+  );
+}
+
+// ── Onboarding / Auth Profile API ───────────────────────────
+
+export interface UserProfile {
+  user: User;
+  style_profile: StyleProfile | null;
+}
+
+export async function getUserProfile(): Promise<ApiResponse<UserProfile>> {
+  return apiFetch<ApiResponse<UserProfile>>('/auth/profile');
+}
+
+export interface CompleteOnboardingPayload {
+  name: string;
+  style_archetypes?: Record<string, number>;
+  color_season?: ColorSeason | null;
+  skin_undertone?: 'warm' | 'cool' | 'neutral' | null;
+}
+
+export async function completeOnboarding(
+  data: CompleteOnboardingPayload
+): Promise<ApiResponse<{ onboarding_completed: boolean }>> {
+  return apiFetch<ApiResponse<{ onboarding_completed: boolean }>>(
+    '/auth/profile/onboarding',
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }
+  );
+}
+
+export interface ColorAnalysisResult {
+  color_season: ColorSeason;
+  skin_undertone: 'warm' | 'cool' | 'neutral';
+  best_colors: string[];
+  color_swatches: string[];
+  reasoning: string;
+  confidence: number;
+}
+
+export async function analyzeColors(
+  imageUrl: string
+): Promise<ApiResponse<ColorAnalysisResult>> {
+  return apiFetch<ApiResponse<ColorAnalysisResult>>(
+    '/auth/profile/color-analysis',
+    {
+      method: 'POST',
+      body: JSON.stringify({ image_url: imageUrl }),
     }
   );
 }

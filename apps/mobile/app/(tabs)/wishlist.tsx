@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { colors, fonts, typography, spacing, radii } from '../lib/theme';
+import { colors, fonts, typography, spacing, radii } from '../../lib/theme';
 import {
   listWishlistItems,
   getCurrentBudget,
@@ -26,7 +26,7 @@ import {
   getHappinessScore,
   type ListWishlistItemsParams,
   type BudgetCurrentResponse,
-} from '../lib/api';
+} from '../../lib/api';
 import type { WishlistItem, WishlistPriority, HappinessScore } from '@adore/shared';
 
 // ── Priority config ──────────────────────────────────────────

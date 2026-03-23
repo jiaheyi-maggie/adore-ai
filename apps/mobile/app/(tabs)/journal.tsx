@@ -14,8 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { MOOD_TAGS } from '@adore/shared';
 import type { MoodTag, PaginatedResponse } from '@adore/shared';
-import { listOutfits, type OutfitWithItems } from '../lib/api';
-import { colors, fonts } from '../lib/theme';
+import { listOutfits, type OutfitWithItems } from '../../lib/api';
+import { colors, fonts } from '../../lib/theme';
 
 // ── Constants ─────────────────────────────────────────────────
 

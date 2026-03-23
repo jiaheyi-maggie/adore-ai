@@ -22,8 +22,8 @@ import {
   removeBackground,
   scanItem,
   createItem,
-} from '../lib/api';
-import { colors, fonts } from '../lib/theme';
+} from '../../lib/api';
+import { colors, fonts } from '../../lib/theme';
 
 type FlowStep = 'pick' | 'processing' | 'review' | 'saving';
 

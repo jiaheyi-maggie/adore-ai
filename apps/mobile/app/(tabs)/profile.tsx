@@ -3,8 +3,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import type { MarketplaceListing, PaginatedResponse } from '@adore/shared';
-import { listListings } from '../lib/api';
-import { colors, fonts } from '../lib/theme';
+import { listListings } from '../../lib/api';
+import { colors, fonts } from '../../lib/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();

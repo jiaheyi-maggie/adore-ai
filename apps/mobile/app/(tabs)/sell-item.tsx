@@ -22,8 +22,8 @@ import {
   suggestPrice,
   generateListing,
   createListing,
-} from '../lib/api';
-import { colors, fonts, radii, spacing } from '../lib/theme';
+} from '../../lib/api';
+import { colors, fonts, radii, spacing } from '../../lib/theme';
 
 const PLATFORM_LABELS: Record<ListingPlatform, string> = {
   depop: 'Depop',

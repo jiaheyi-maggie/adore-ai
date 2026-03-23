@@ -23,8 +23,8 @@ import {
   createWishlistItem,
   getHappinessScore,
   type ScannedWishlistItem,
-} from '../lib/api';
-import { colors, fonts, spacing, radii } from '../lib/theme';
+} from '../../lib/api';
+import { colors, fonts, spacing, radii } from '../../lib/theme';
 import type { HappinessScore } from '@adore/shared';
 
 type FlowStep = 'pick' | 'processing' | 'review' | 'happiness-result';
