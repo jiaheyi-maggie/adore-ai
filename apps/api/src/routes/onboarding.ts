@@ -30,7 +30,15 @@ const colorAnalysisSchema = z.object({
 
 onboarding.post(
   '/profile/onboarding',
-  zValidator('json', completeOnboardingSchema),
+  zValidator('json', completeOnboardingSchema, (result, c) => {
+    if (!result.success) {
+      console.error('Onboarding validation failed:', JSON.stringify(result.error.issues, null, 2));
+      return c.json(
+        { data: null, error: { code: 'VALIDATION_FAILED', message: result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') } },
+        400
+      );
+    }
+  }),
   async (c) => {
     const supabase = c.get('supabase');
     const userId = c.get('userId');
