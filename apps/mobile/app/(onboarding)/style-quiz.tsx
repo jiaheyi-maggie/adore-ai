@@ -9,97 +9,391 @@ import {
   Easing,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, radii, spacing } from '../../lib/theme';
 
-// ── Style quiz definitions ──────────────────────────────────
+// ── Types ──────────────────────────────────────────────────
 
-interface StyleChoice {
-  question: string;
-  optionA: { label: string; icon: string; archetype: string };
-  optionB: { label: string; icon: string; archetype: string };
+interface OccasionCard {
+  id: string;
+  emoji: string;
+  label: string;
 }
 
-const STYLE_QUESTIONS: StyleChoice[] = [
+interface StyleCard {
+  id: string;
+  emoji: string;
+  label: string;
+  tags: {
+    categories: string[];
+    formality: string[];
+    colors: string[];
+    patterns: string[];
+    style_tags: string[];
+  };
+}
+
+// ── Data ───────────────────────────────────────────────────
+
+const OCCASIONS: OccasionCard[] = [
+  { id: 'casual', emoji: '\u2600\uFE0F', label: 'Casual / daily life' },
+  { id: 'work', emoji: '\uD83D\uDCBC', label: 'Work / office' },
+  { id: 'social', emoji: '\uD83C\uDF89', label: 'Social / going out' },
+  { id: 'active', emoji: '\uD83C\uDFC3', label: 'Active / fitness' },
+  { id: 'creative', emoji: '\uD83C\uDFA8', label: 'Creative / expressive' },
+  { id: 'events', emoji: '\uD83D\uDC57', label: 'Events / dress up' },
+];
+
+const LIKED_STYLE_CARDS: StyleCard[] = [
   {
-    question: 'Which speaks to you more?',
-    optionA: {
-      label: 'Minimal\n& Clean',
-      icon: 'remove-outline',
-      archetype: 'minimalist',
-    },
-    optionB: {
-      label: 'Layered\n& Maximal',
-      icon: 'layers-outline',
-      archetype: 'maximalist',
+    id: 'structured-blazer',
+    emoji: '\uD83E\uDDE5',
+    label: 'Structured blazer + slim pants',
+    tags: {
+      categories: ['outerwear', 'bottoms'],
+      formality: ['business', 'smart_casual'],
+      colors: ['navy', 'charcoal', 'black'],
+      patterns: ['solid'],
+      style_tags: ['tailored', 'polished', 'classic'],
     },
   },
   {
-    question: 'Your color instinct?',
-    optionA: {
-      label: 'Neutral\nEarth Tones',
-      icon: 'leaf-outline',
-      archetype: 'earthy',
-    },
-    optionB: {
-      label: 'Bold\nSaturated Color',
-      icon: 'color-palette-outline',
-      archetype: 'colorful',
-    },
-  },
-  {
-    question: 'How do you like your fit?',
-    optionA: {
-      label: 'Structured\n& Tailored',
-      icon: 'resize-outline',
-      archetype: 'classic',
-    },
-    optionB: {
-      label: 'Relaxed\n& Flowy',
-      icon: 'water-outline',
-      archetype: 'bohemian',
+    id: 'flowy-sundress',
+    emoji: '\uD83D\uDC57',
+    label: 'Flowy sundress + sandals',
+    tags: {
+      categories: ['dresses', 'shoes'],
+      formality: ['casual'],
+      colors: ['pastels', 'white', 'florals'],
+      patterns: ['floral', 'solid'],
+      style_tags: ['feminine', 'relaxed', 'romantic'],
     },
   },
   {
-    question: 'Your style timeline?',
-    optionA: {
-      label: 'Classic\n& Timeless',
-      icon: 'time-outline',
-      archetype: 'classic',
-    },
-    optionB: {
-      label: 'Trend-Forward\n& Edgy',
-      icon: 'flash-outline',
-      archetype: 'edgy',
+    id: 'all-black',
+    emoji: '\uD83D\uDDA4',
+    label: 'All-black everything',
+    tags: {
+      categories: ['tops', 'bottoms', 'outerwear'],
+      formality: ['smart_casual', 'casual'],
+      colors: ['black'],
+      patterns: ['solid'],
+      style_tags: ['minimalist', 'monochrome', 'edgy'],
     },
   },
   {
-    question: 'Your shopping philosophy?',
-    optionA: {
-      label: 'Investment\nPieces',
-      icon: 'diamond-outline',
-      archetype: 'investment',
+    id: 'earth-tones',
+    emoji: '\uD83C\uDF3F',
+    label: 'Earth tones + linen',
+    tags: {
+      categories: ['tops', 'bottoms'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['beige', 'olive', 'terracotta', 'cream'],
+      patterns: ['solid'],
+      style_tags: ['earthy', 'natural', 'organic'],
     },
-    optionB: {
-      label: 'Variety\n& Rotation',
-      icon: 'shuffle-outline',
-      archetype: 'eclectic',
+  },
+  {
+    id: 'streetwear',
+    emoji: '\u26A1',
+    label: 'Streetwear + sneakers',
+    tags: {
+      categories: ['tops', 'shoes', 'outerwear'],
+      formality: ['casual'],
+      colors: ['white', 'black', 'bold'],
+      patterns: ['graphic', 'solid'],
+      style_tags: ['streetwear', 'athletic', 'urban'],
+    },
+  },
+  {
+    id: 'minimal-jewelry',
+    emoji: '\uD83D\uDC8E',
+    label: 'Minimal jewelry + clean lines',
+    tags: {
+      categories: ['jewelry', 'accessories'],
+      formality: ['smart_casual', 'business'],
+      colors: ['gold', 'silver', 'white', 'neutral'],
+      patterns: ['solid'],
+      style_tags: ['minimalist', 'refined', 'understated'],
+    },
+  },
+  {
+    id: 'bold-prints',
+    emoji: '\uD83C\uDFA8',
+    label: 'Bold prints + color mixing',
+    tags: {
+      categories: ['tops', 'dresses', 'bottoms'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['multi', 'bright', 'saturated'],
+      patterns: ['abstract', 'geometric', 'floral'],
+      style_tags: ['maximalist', 'colorful', 'eclectic'],
+    },
+  },
+  {
+    id: 'preppy',
+    emoji: '\uD83D\uDC54',
+    label: 'Preppy + polished',
+    tags: {
+      categories: ['tops', 'bottoms', 'outerwear'],
+      formality: ['smart_casual', 'business'],
+      colors: ['navy', 'white', 'green', 'red'],
+      patterns: ['striped', 'plaid', 'solid'],
+      style_tags: ['preppy', 'classic', 'collegiate'],
+    },
+  },
+  {
+    id: 'romantic-soft',
+    emoji: '\uD83C\uDF38',
+    label: 'Romantic + soft',
+    tags: {
+      categories: ['dresses', 'tops'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['blush', 'lavender', 'cream', 'dusty-rose'],
+      patterns: ['floral', 'solid'],
+      style_tags: ['romantic', 'feminine', 'soft'],
+    },
+  },
+  {
+    id: 'leather-edge',
+    emoji: '\uD83D\uDD25',
+    label: 'Leather + edge',
+    tags: {
+      categories: ['outerwear', 'shoes', 'accessories'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['black', 'dark-brown', 'burgundy'],
+      patterns: ['solid'],
+      style_tags: ['edgy', 'rocker', 'bold'],
+    },
+  },
+  {
+    id: 'cozy-knits',
+    emoji: '\u2615',
+    label: 'Cozy knits + layers',
+    tags: {
+      categories: ['tops', 'outerwear'],
+      formality: ['casual'],
+      colors: ['cream', 'oatmeal', 'camel', 'grey'],
+      patterns: ['solid', 'striped'],
+      style_tags: ['cozy', 'layered', 'hygge'],
+    },
+  },
+  {
+    id: 'sparkle-statement',
+    emoji: '\u2728',
+    label: 'Sparkle + statement pieces',
+    tags: {
+      categories: ['jewelry', 'dresses', 'accessories'],
+      formality: ['formal', 'smart_casual'],
+      colors: ['gold', 'silver', 'metallic'],
+      patterns: ['solid', 'other'],
+      style_tags: ['glamorous', 'statement', 'bold'],
+    },
+  },
+  {
+    id: 'relaxed-beachy',
+    emoji: '\uD83C\uDFD6\uFE0F',
+    label: 'Relaxed + beachy',
+    tags: {
+      categories: ['tops', 'bottoms', 'dresses'],
+      formality: ['casual'],
+      colors: ['white', 'blue', 'sand', 'coral'],
+      patterns: ['solid', 'striped'],
+      style_tags: ['beachy', 'relaxed', 'coastal'],
+    },
+  },
+  {
+    id: 'power-dressing',
+    emoji: '\uD83D\uDC51',
+    label: 'Power dressing',
+    tags: {
+      categories: ['outerwear', 'bottoms', 'dresses'],
+      formality: ['business', 'formal'],
+      colors: ['black', 'red', 'navy', 'white'],
+      patterns: ['solid'],
+      style_tags: ['powerful', 'commanding', 'sharp'],
+    },
+  },
+  {
+    id: 'vintage-retro',
+    emoji: '\uD83C\uDFAD',
+    label: 'Vintage + retro',
+    tags: {
+      categories: ['dresses', 'tops', 'accessories'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['mustard', 'burgundy', 'teal', 'rust'],
+      patterns: ['plaid', 'polka-dot', 'floral'],
+      style_tags: ['vintage', 'retro', 'nostalgic'],
     },
   },
 ];
+
+const DISLIKED_STYLE_CARDS: StyleCard[] = [
+  {
+    id: 'neon-bright',
+    emoji: '\uD83D\uDE0E',
+    label: 'Neon + ultra-bright colors',
+    tags: {
+      categories: ['tops', 'activewear'],
+      formality: ['casual'],
+      colors: ['neon', 'fluorescent'],
+      patterns: ['solid', 'graphic'],
+      style_tags: ['neon', 'loud', 'attention-grabbing'],
+    },
+  },
+  {
+    id: 'head-to-toe-logos',
+    emoji: '\uD83C\uDFF7\uFE0F',
+    label: 'Head-to-toe logos',
+    tags: {
+      categories: ['tops', 'accessories', 'bags'],
+      formality: ['casual'],
+      colors: ['multi'],
+      patterns: ['graphic'],
+      style_tags: ['logo-heavy', 'branded', 'flashy'],
+    },
+  },
+  {
+    id: 'ultra-baggy',
+    emoji: '\uD83E\uDDCA',
+    label: 'Ultra-baggy oversized',
+    tags: {
+      categories: ['tops', 'bottoms'],
+      formality: ['casual'],
+      colors: ['neutral'],
+      patterns: ['solid'],
+      style_tags: ['oversized', 'baggy', 'shapeless'],
+    },
+  },
+  {
+    id: 'animal-print-heavy',
+    emoji: '\uD83D\uDC06',
+    label: 'Animal print everything',
+    tags: {
+      categories: ['tops', 'dresses', 'accessories'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['brown', 'black', 'gold'],
+      patterns: ['animal-print'],
+      style_tags: ['animal-print', 'bold-pattern', 'statement'],
+    },
+  },
+  {
+    id: 'frilly-ruffles',
+    emoji: '\uD83C\uDF80',
+    label: 'Lots of frills + ruffles',
+    tags: {
+      categories: ['dresses', 'tops'],
+      formality: ['casual', 'formal'],
+      colors: ['pastels', 'white'],
+      patterns: ['solid'],
+      style_tags: ['frilly', 'ruffled', 'overly-feminine'],
+    },
+  },
+  {
+    id: 'athleisure-only',
+    emoji: '\uD83E\uDD3E',
+    label: 'Athleisure as everyday wear',
+    tags: {
+      categories: ['activewear', 'shoes'],
+      formality: ['casual'],
+      colors: ['black', 'grey'],
+      patterns: ['solid'],
+      style_tags: ['athleisure', 'sporty', 'gym-to-street'],
+    },
+  },
+  {
+    id: 'heavy-distressing',
+    emoji: '\u2702\uFE0F',
+    label: 'Heavy rips + distressing',
+    tags: {
+      categories: ['bottoms', 'tops'],
+      formality: ['casual'],
+      colors: ['blue', 'black'],
+      patterns: ['solid'],
+      style_tags: ['distressed', 'ripped', 'grunge'],
+    },
+  },
+  {
+    id: 'matching-sets',
+    emoji: '\uD83D\uDC6F',
+    label: 'Matchy-matchy sets',
+    tags: {
+      categories: ['tops', 'bottoms'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['multi'],
+      patterns: ['solid', 'graphic'],
+      style_tags: ['co-ord', 'matching', 'uniform'],
+    },
+  },
+  {
+    id: 'chunky-platform',
+    emoji: '\uD83E\uDE74',
+    label: 'Chunky platforms + big soles',
+    tags: {
+      categories: ['shoes'],
+      formality: ['casual'],
+      colors: ['black', 'white'],
+      patterns: ['solid'],
+      style_tags: ['platform', 'chunky', 'maximalist-shoe'],
+    },
+  },
+  {
+    id: 'sheer-cutouts',
+    emoji: '\uD83D\uDD73\uFE0F',
+    label: 'Sheer fabrics + cutouts',
+    tags: {
+      categories: ['tops', 'dresses'],
+      formality: ['casual', 'smart_casual'],
+      colors: ['black', 'nude'],
+      patterns: ['solid'],
+      style_tags: ['sheer', 'cutout', 'revealing'],
+    },
+  },
+  {
+    id: 'cargo-utility',
+    emoji: '\uD83E\uDDF0',
+    label: 'Heavy cargo + utility',
+    tags: {
+      categories: ['bottoms', 'outerwear'],
+      formality: ['casual'],
+      colors: ['olive', 'khaki', 'brown'],
+      patterns: ['solid'],
+      style_tags: ['cargo', 'utility', 'tactical'],
+    },
+  },
+  {
+    id: 'boho-maximal',
+    emoji: '\uD83E\uDEE7',
+    label: 'Full boho with fringe',
+    tags: {
+      categories: ['dresses', 'accessories'],
+      formality: ['casual'],
+      colors: ['brown', 'rust', 'turquoise'],
+      patterns: ['other', 'abstract'],
+      style_tags: ['boho', 'fringe', 'festival'],
+    },
+  },
+];
+
+const TOTAL_STEPS = 4;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GRID_GAP = spacing.sm;
+const CARD_COLUMNS_OCCASION = 2;
+const CARD_COLUMNS_STYLE = 3;
 
 // ── Component ───────────────────────────────────────────────
 
 export default function StyleQuizScreen() {
   const router = useRouter();
 
-  // Phase: 'name' or 'quiz'
-  const [phase, setPhase] = useState<'name' | 'quiz'>('name');
+  const [step, setStep] = useState(0); // 0=name, 1=occasions, 2=liked, 3=disliked
   const [name, setName] = useState('');
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [selectedOccasions, setSelectedOccasions] = useState<Set<string>>(new Set());
+  const [likedStyles, setLikedStyles] = useState<Set<string>>(new Set());
+  const [dislikedStyles, setDislikedStyles] = useState<Set<string>>(new Set());
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -119,48 +413,35 @@ export default function StyleQuizScreen() {
     });
   };
 
-  const handleNameSubmit = () => {
-    if (!name.trim()) return;
-    animateTransition(() => setPhase('quiz'));
-  };
-
-  const handleChoice = (archetype: string) => {
-    // Accumulate archetype scores
-    const updated = { ...answers };
-    updated[archetype] = (updated[archetype] ?? 0) + 0.2;
-
-    setAnswers(updated);
-
-    if (currentQuestion < STYLE_QUESTIONS.length - 1) {
-      animateTransition(() => setCurrentQuestion((prev) => prev + 1));
+  const goNext = () => {
+    if (step < TOTAL_STEPS - 1) {
+      animateTransition(() => setStep((s) => s + 1));
     } else {
-      // Quiz complete - normalize scores and navigate
-      const total = Object.values(updated).reduce((sum, v) => sum + v, 0);
-      const normalized: Record<string, number> = {};
-      for (const [key, value] of Object.entries(updated)) {
-        normalized[key] = Math.round((value / total) * 100) / 100;
-      }
+      // Collect all tag arrays from liked/disliked cards
+      const likedTags = collectTags(LIKED_STYLE_CARDS, likedStyles);
+      const dislikedTags = collectTags(DISLIKED_STYLE_CARDS, dislikedStyles);
 
-      // Navigate to color analysis, passing data via params
       router.push({
         pathname: '/color-analysis',
         params: {
           name: name.trim(),
-          style_archetypes: JSON.stringify(normalized),
+          occasions: JSON.stringify(Array.from(selectedOccasions)),
+          liked_styles: JSON.stringify(likedTags),
+          disliked_styles: JSON.stringify(dislikedTags),
         },
       });
     }
   };
 
-  // ── Name Phase ──────────────────────────────────────────────
+  // ── Step 0: Name Input ──────────────────────────────────
 
-  if (phase === 'name') {
+  if (step === 0) {
     return (
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.centeredContent, { opacity: fadeAnim }]}>
           <Text style={styles.heading}>What should I call you?</Text>
           <Text style={styles.subtext}>So I can personalize your experience.</Text>
 
@@ -174,12 +455,12 @@ export default function StyleQuizScreen() {
             autoCapitalize="words"
             autoCorrect={false}
             returnKeyType="next"
-            onSubmitEditing={handleNameSubmit}
+            onSubmitEditing={() => name.trim() && goNext()}
           />
 
           <Pressable
             style={[styles.continueButton, !name.trim() && styles.buttonDisabled]}
-            onPress={handleNameSubmit}
+            onPress={goNext}
             disabled={!name.trim()}
           >
             <Text style={styles.continueButtonText}>Continue</Text>
@@ -187,95 +468,292 @@ export default function StyleQuizScreen() {
           </Pressable>
         </Animated.View>
 
-        {/* Progress dots */}
-        <View style={styles.dotsContainer}>
-          <View style={[styles.dot, styles.dotActive]} />
-          {STYLE_QUESTIONS.map((_, i) => (
-            <View key={i} style={styles.dot} />
-          ))}
-        </View>
+        <ProgressDots current={step} total={TOTAL_STEPS} />
       </KeyboardAvoidingView>
     );
   }
 
-  // ── Quiz Phase ────────────────────────────────────────────
+  // ── Step 1: Occasion Map ────────────────────────────────
 
-  const question = STYLE_QUESTIONS[currentQuestion];
+  if (step === 1) {
+    const toggleOccasion = (id: string) => {
+      setSelectedOccasions((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
+    const cardWidth =
+      (SCREEN_WIDTH - spacing['3xl'] * 2 - GRID_GAP * (CARD_COLUMNS_OCCASION - 1)) /
+      CARD_COLUMNS_OCCASION;
+
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <Text style={styles.heading}>What does your week look like?</Text>
+            <Text style={styles.subtext}>Tap all that apply.</Text>
+
+            <View style={styles.gridContainer}>
+              {OCCASIONS.map((card) => {
+                const selected = selectedOccasions.has(card.id);
+                return (
+                  <Pressable
+                    key={card.id}
+                    style={[
+                      styles.occasionCard,
+                      { width: cardWidth },
+                      selected && styles.cardSelected,
+                    ]}
+                    onPress={() => toggleOccasion(card.id)}
+                  >
+                    <Text style={styles.cardEmoji}>{card.emoji}</Text>
+                    <Text style={styles.occasionLabel}>{card.label}</Text>
+                    {selected && (
+                      <View style={styles.checkBadge}>
+                        <Ionicons name="checkmark" size={14} color={colors.surface} />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
+        </ScrollView>
+
+        <View style={styles.bottomBar}>
+          <Pressable
+            style={[
+              styles.continueButton,
+              selectedOccasions.size === 0 && styles.buttonDisabled,
+            ]}
+            onPress={goNext}
+            disabled={selectedOccasions.size === 0}
+          >
+            <Text style={styles.continueButtonText}>Continue</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.surface} />
+          </Pressable>
+          <ProgressDots current={step} total={TOTAL_STEPS} />
+        </View>
+      </View>
+    );
+  }
+
+  // ── Step 2: Visual Taste (Liked) ────────────────────────
+
+  if (step === 2) {
+    const toggleLiked = (id: string) => {
+      setLikedStyles((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
+    const cardWidth =
+      (SCREEN_WIDTH - spacing['3xl'] * 2 - GRID_GAP * (CARD_COLUMNS_STYLE - 1)) /
+      CARD_COLUMNS_STYLE;
+
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <Text style={styles.heading}>Outfits that feel like YOU</Text>
+            <Text style={styles.subtext}>
+              Tap anything that catches your eye {'\u2014'} no wrong answers.
+            </Text>
+
+            <View style={styles.gridContainer}>
+              {LIKED_STYLE_CARDS.map((card) => {
+                const selected = likedStyles.has(card.id);
+                return (
+                  <Pressable
+                    key={card.id}
+                    style={[
+                      styles.styleCard,
+                      { width: cardWidth },
+                      selected && styles.cardSelected,
+                    ]}
+                    onPress={() => toggleLiked(card.id)}
+                  >
+                    <Text style={styles.styleCardEmoji}>{card.emoji}</Text>
+                    <Text style={styles.styleCardLabel}>{card.label}</Text>
+                    {selected && (
+                      <View style={styles.checkBadge}>
+                        <Ionicons name="checkmark" size={14} color={colors.surface} />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
+        </ScrollView>
+
+        <View style={styles.bottomBar}>
+          {likedStyles.size > 0 && (
+            <Text style={styles.counterText}>{likedStyles.size} selected</Text>
+          )}
+          <Pressable
+            style={[
+              styles.continueButton,
+              likedStyles.size < 3 && styles.buttonDisabled,
+            ]}
+            onPress={goNext}
+            disabled={likedStyles.size < 3}
+          >
+            <Text style={styles.continueButtonText}>
+              {likedStyles.size < 3
+                ? `Pick at least ${3 - likedStyles.size} more`
+                : 'Continue'}
+            </Text>
+            {likedStyles.size >= 3 && (
+              <Ionicons name="arrow-forward" size={18} color={colors.surface} />
+            )}
+          </Pressable>
+          <ProgressDots current={step} total={TOTAL_STEPS} />
+        </View>
+      </View>
+    );
+  }
+
+  // ── Step 3: Anti-Taste (Disliked) ──────────────────────
+
+  const toggleDisliked = (id: string) => {
+    setDislikedStyles((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const antiCardWidth =
+    (SCREEN_WIDTH - spacing['3xl'] * 2 - GRID_GAP * (CARD_COLUMNS_STYLE - 1)) /
+    CARD_COLUMNS_STYLE;
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <Text style={styles.questionNumber}>
-          {currentQuestion + 1} of {STYLE_QUESTIONS.length}
-        </Text>
-        <Text style={styles.heading}>{question.question}</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={{ opacity: fadeAnim }}>
+          <Text style={styles.heading}>Not your thing</Text>
+          <Text style={styles.subtext}>
+            Anything you'd definitely avoid? (optional)
+          </Text>
 
-        <View style={styles.choicesRow}>
-          {/* Option A */}
-          <Pressable
-            style={styles.choiceCard}
-            onPress={() => handleChoice(question.optionA.archetype)}
-          >
-            <View style={styles.choiceIconContainer}>
-              <Ionicons
-                name={question.optionA.icon as any}
-                size={36}
-                color={colors.accent}
-              />
-            </View>
-            <Text style={styles.choiceLabel}>{question.optionA.label}</Text>
-          </Pressable>
-
-          {/* Divider */}
-          <View style={styles.orDivider}>
-            <Text style={styles.orText}>or</Text>
+          <View style={styles.gridContainer}>
+            {DISLIKED_STYLE_CARDS.map((card) => {
+              const selected = dislikedStyles.has(card.id);
+              return (
+                <Pressable
+                  key={card.id}
+                  style={[
+                    styles.styleCard,
+                    { width: antiCardWidth },
+                    selected && styles.cardRejected,
+                  ]}
+                  onPress={() => toggleDisliked(card.id)}
+                >
+                  <Text style={styles.styleCardEmoji}>{card.emoji}</Text>
+                  <Text style={styles.styleCardLabel}>{card.label}</Text>
+                  {selected && (
+                    <View style={styles.rejectBadge}>
+                      <Ionicons name="close" size={14} color={colors.surface} />
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
           </View>
+        </Animated.View>
+      </ScrollView>
 
-          {/* Option B */}
-          <Pressable
-            style={styles.choiceCard}
-            onPress={() => handleChoice(question.optionB.archetype)}
-          >
-            <View style={styles.choiceIconContainer}>
-              <Ionicons
-                name={question.optionB.icon as any}
-                size={36}
-                color={colors.accent}
-              />
-            </View>
-            <Text style={styles.choiceLabel}>{question.optionB.label}</Text>
-          </Pressable>
-        </View>
-      </Animated.View>
-
-      {/* Progress dots */}
-      <View style={styles.dotsContainer}>
-        <View style={styles.dotCompleted} />
-        {STYLE_QUESTIONS.map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              i === currentQuestion && styles.dotActive,
-              i < currentQuestion && styles.dotCompleted,
-            ]}
-          />
-        ))}
+      <View style={styles.bottomBar}>
+        {dislikedStyles.size > 0 && (
+          <Text style={styles.counterText}>{dislikedStyles.size} marked</Text>
+        )}
+        <Pressable style={styles.continueButton} onPress={goNext}>
+          <Text style={styles.continueButtonText}>
+            {dislikedStyles.size === 0 ? 'Skip' : 'Continue'}
+          </Text>
+          <Ionicons name="arrow-forward" size={18} color={colors.surface} />
+        </Pressable>
+        <ProgressDots current={step} total={TOTAL_STEPS} />
       </View>
     </View>
   );
 }
 
+// ── Helpers ─────────────────────────────────────────────────
+
+function collectTags(cards: StyleCard[], selectedIds: Set<string>): string[] {
+  const tagSet = new Set<string>();
+  for (const card of cards) {
+    if (selectedIds.has(card.id)) {
+      for (const tag of card.tags.style_tags) tagSet.add(tag);
+      for (const cat of card.tags.categories) tagSet.add(cat);
+      for (const color of card.tags.colors) tagSet.add(color);
+      for (const pattern of card.tags.patterns) tagSet.add(pattern);
+      for (const formality of card.tags.formality) tagSet.add(formality);
+    }
+  }
+  return Array.from(tagSet);
+}
+
+// ── Progress Dots ───────────────────────────────────────────
+
+function ProgressDots({ current, total }: { current: number; total: number }) {
+  return (
+    <View style={styles.dotsContainer}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.dot,
+            i === current && styles.dotActive,
+            i < current && styles.dotCompleted,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ── Styles ──────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingHorizontal: spacing['3xl'],
   },
-  content: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: spacing['3xl'],
+    paddingTop: spacing['5xl'],
+    paddingBottom: spacing.lg,
+  },
+  centeredContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: spacing['3xl'],
   },
   heading: {
     fontFamily: fonts.cormorant.semibold,
@@ -289,15 +767,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing['3xl'],
-  },
-  questionNumber: {
-    fontFamily: fonts.inter.medium,
-    fontSize: 12,
-    color: colors.textMuted,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginBottom: spacing.lg,
+    marginBottom: spacing['2xl'],
   },
   nameInput: {
     fontFamily: fonts.cormorant.medium,
@@ -314,11 +784,13 @@ const styles = StyleSheet.create({
   continueButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.accent,
     borderRadius: radii.md,
     paddingVertical: 14,
     paddingHorizontal: spacing['2xl'],
+    width: '100%',
   },
   buttonDisabled: {
     opacity: 0.4,
@@ -329,61 +801,120 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.surface,
   },
-  choicesRow: {
+
+  // Grid
+  gridContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    marginTop: spacing['2xl'],
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
   },
-  choiceCard: {
-    flex: 1,
+
+  // Occasion cards (2-column)
+  occasionCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    paddingVertical: spacing['3xl'],
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: spacing.sm,
+    position: 'relative',
   },
-  choiceIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.accentSoft,
-    justifyContent: 'center',
-    alignItems: 'center',
+  cardEmoji: {
+    fontSize: 32,
   },
-  choiceLabel: {
+  occasionLabel: {
     fontFamily: fonts.inter.medium,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: colors.textPrimary,
     textAlign: 'center',
-    lineHeight: 20,
   },
-  orDivider: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border,
+  cardSelected: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+    backgroundColor: colors.accentSoft + '40',
+  },
+  checkBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'absolute',
-    left: '50%',
-    marginLeft: -14,
-    zIndex: 1,
   },
-  orText: {
+
+  // Style cards (3-column)
+  styleCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs + 2,
+    alignItems: 'center',
+    gap: spacing.xs,
+    position: 'relative',
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+  styleCardEmoji: {
+    fontSize: 26,
+  },
+  styleCardLabel: {
     fontFamily: fonts.inter.regular,
     fontSize: 11,
-    color: colors.textMuted,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    lineHeight: 15,
   },
+
+  // Rejected card styling
+  cardRejected: {
+    borderColor: colors.error,
+    borderWidth: 2,
+    backgroundColor: colors.error + '10',
+  },
+  rejectBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Bottom bar
+  bottomBar: {
+    paddingHorizontal: spacing['3xl'],
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  counterText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.accent,
+    textAlign: 'center',
+  },
+
+  // Progress dots
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingBottom: spacing['4xl'],
+    paddingVertical: spacing.md,
   },
   dot: {
     width: 8,
@@ -396,9 +927,6 @@ const styles = StyleSheet.create({
     width: 24,
   },
   dotCompleted: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
     backgroundColor: colors.accentSoft,
   },
 });

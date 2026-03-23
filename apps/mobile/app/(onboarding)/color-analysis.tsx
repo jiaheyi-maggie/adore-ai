@@ -19,7 +19,14 @@ type ScreenPhase = 'prompt' | 'analyzing' | 'result';
 
 export default function ColorAnalysisScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ name: string; style_archetypes: string }>();
+  const params = useLocalSearchParams<{
+    name: string;
+    occasions: string;
+    liked_styles: string;
+    disliked_styles: string;
+    // Legacy compat — may also receive style_archetypes
+    style_archetypes?: string;
+  }>();
 
   const [phase, setPhase] = useState<ScreenPhase>('prompt');
   const [result, setResult] = useState<ColorAnalysisResult | null>(null);
@@ -42,6 +49,20 @@ export default function ColorAnalysisScreen() {
     });
   };
 
+  const processImage = async (imageUri: string) => {
+    animateToPhase('analyzing');
+    try {
+      const { public_url } = await uploadImage(imageUri);
+      const response = await analyzeColors(public_url);
+      setResult(response.data);
+      animateToPhase('result');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Color analysis failed';
+      Alert.alert('Analysis failed', message);
+      animateToPhase('prompt');
+    }
+  };
+
   const handleTakeSelfie = async () => {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -61,17 +82,31 @@ export default function ColorAnalysisScreen() {
       });
 
       if (pickerResult.canceled) return;
+      await processImage(pickerResult.assets[0].uri);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Color analysis failed';
+      Alert.alert('Analysis failed', message);
+      animateToPhase('prompt');
+    }
+  };
 
-      const imageUri = pickerResult.assets[0].uri;
-      animateToPhase('analyzing');
+  const handleChooseFromLibrary = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Photo library permission is required.');
+        return;
+      }
 
-      // Upload the selfie
-      const { public_url } = await uploadImage(imageUri);
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-      // Analyze colors via Gemini
-      const response = await analyzeColors(public_url);
-      setResult(response.data);
-      animateToPhase('result');
+      if (pickerResult.canceled) return;
+      await processImage(pickerResult.assets[0].uri);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Color analysis failed';
       Alert.alert('Analysis failed', message);
@@ -84,7 +119,9 @@ export default function ColorAnalysisScreen() {
       pathname: '/first-outfit',
       params: {
         name: params.name,
-        style_archetypes: params.style_archetypes,
+        occasions: params.occasions ?? '[]',
+        liked_styles: params.liked_styles ?? '[]',
+        disliked_styles: params.disliked_styles ?? '[]',
         color_season: result?.color_season ?? '',
         skin_undertone: result?.skin_undertone ?? '',
         best_colors: result?.best_colors ? JSON.stringify(result.best_colors) : '[]',
@@ -100,7 +137,9 @@ export default function ColorAnalysisScreen() {
       pathname: '/first-outfit',
       params: {
         name: params.name,
-        style_archetypes: params.style_archetypes,
+        occasions: params.occasions ?? '[]',
+        liked_styles: params.liked_styles ?? '[]',
+        disliked_styles: params.disliked_styles ?? '[]',
         color_season: '',
         skin_undertone: '',
         best_colors: '[]',
@@ -134,6 +173,11 @@ export default function ColorAnalysisScreen() {
 
           <Pressable style={styles.cameraButton} onPress={handleTakeSelfie}>
             <Ionicons name="camera" size={28} color={colors.surface} />
+          </Pressable>
+
+          <Pressable style={styles.libraryButton} onPress={handleChooseFromLibrary}>
+            <Ionicons name="images-outline" size={20} color={colors.secondary} />
+            <Text style={styles.libraryButtonText}>Choose from Library</Text>
           </Pressable>
         </Animated.View>
 
@@ -305,6 +349,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  libraryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  libraryButtonText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.secondary,
   },
   skipButton: {
     alignItems: 'center',

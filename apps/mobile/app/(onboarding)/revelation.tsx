@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, radii, spacing } from '../../lib/theme';
 import { completeOnboarding } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import { COLOR_SEASONS } from '@adore/shared';
 import type { ColorSeason } from '@adore/shared';
 
 interface DetectedItemSummary {
@@ -28,13 +29,17 @@ export default function RevelationScreen() {
   const { refreshOnboardingStatus } = useAuth();
   const params = useLocalSearchParams<{
     name: string;
-    style_archetypes: string;
+    occasions: string;
+    liked_styles: string;
+    disliked_styles: string;
     color_season: string;
     skin_undertone: string;
     best_colors: string;
     color_swatches: string;
     detected_items: string;
     photo_url: string;
+    // Legacy compat
+    style_archetypes?: string;
   }>();
 
   const [isCompleting, setIsCompleting] = useState(false);
@@ -60,9 +65,15 @@ export default function RevelationScreen() {
   }, []);
 
   const name = params.name || 'there';
-  const styleArchetypes: Record<string, number> = params.style_archetypes
-    ? JSON.parse(params.style_archetypes)
-    : {};
+  const occasions: string[] = params.occasions
+    ? JSON.parse(params.occasions)
+    : [];
+  const likedStyles: string[] = params.liked_styles
+    ? JSON.parse(params.liked_styles)
+    : [];
+  const dislikedStyles: string[] = params.disliked_styles
+    ? JSON.parse(params.disliked_styles)
+    : [];
   const colorSeason = params.color_season || null;
   const skinUndertone = params.skin_undertone || null;
   const bestColors: string[] = params.best_colors
@@ -75,12 +86,10 @@ export default function RevelationScreen() {
     ? JSON.parse(params.detected_items)
     : [];
 
-  // Compute dominant archetype
-  const topArchetype = Object.entries(styleArchetypes).sort(
-    ([, a], [, b]) => b - a,
-  )[0];
-  const archetypeLabel = topArchetype
-    ? topArchetype[0].charAt(0).toUpperCase() + topArchetype[0].slice(1)
+  // Derive a style label from liked style tags for the badge
+  const styleSummaryTag = likedStyles.length > 0 ? likedStyles[0] : null;
+  const archetypeLabel = styleSummaryTag
+    ? styleSummaryTag.charAt(0).toUpperCase() + styleSummaryTag.slice(1)
     : null;
 
   // Color season display name
@@ -108,11 +117,24 @@ export default function RevelationScreen() {
   const handleStartExploring = async () => {
     setIsCompleting(true);
     try {
+      // Validate color_season against the enum before sending — Gemini may have
+      // returned a format that doesn't match (e.g. "Cool Summer" vs "summer-cool").
+      const validColorSeason =
+        colorSeason && (COLOR_SEASONS as readonly string[]).includes(colorSeason)
+          ? (colorSeason as ColorSeason)
+          : undefined;
+      const validUndertone =
+        skinUndertone && ['warm', 'cool', 'neutral'].includes(skinUndertone)
+          ? (skinUndertone as 'warm' | 'cool' | 'neutral')
+          : undefined;
+
       await completeOnboarding({
         name,
-        style_archetypes: styleArchetypes,
-        color_season: (colorSeason as ColorSeason) || undefined,
-        skin_undertone: (skinUndertone as 'warm' | 'cool' | 'neutral') || undefined,
+        occasions,
+        liked_styles: likedStyles,
+        disliked_styles: dislikedStyles,
+        color_season: validColorSeason,
+        skin_undertone: validUndertone,
       });
 
       // Refresh auth state to detect onboarding_completed = true

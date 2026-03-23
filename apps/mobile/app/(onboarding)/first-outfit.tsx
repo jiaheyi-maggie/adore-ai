@@ -26,11 +26,15 @@ export default function FirstOutfitScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     name: string;
-    style_archetypes: string;
+    occasions: string;
+    liked_styles: string;
+    disliked_styles: string;
     color_season: string;
     skin_undertone: string;
     best_colors: string;
     color_swatches: string;
+    // Legacy compat
+    style_archetypes?: string;
   }>();
 
   const [phase, setPhase] = useState<ScreenPhase>('prompt');
@@ -55,28 +59,9 @@ export default function FirstOutfitScreen() {
     });
   };
 
-  const handleTakePhoto = async () => {
+  const processOutfitImage = async (imageUri: string) => {
+    animateToPhase('analyzing');
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          'Camera access needed',
-          'Please allow camera access in Settings to snap your outfit.',
-        );
-        return;
-      }
-
-      const pickerResult = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.8,
-      });
-
-      if (pickerResult.canceled) return;
-
-      const imageUri = pickerResult.assets[0].uri;
-      animateToPhase('analyzing');
-
       // Upload the photo
       const { public_url } = await uploadImage(imageUri);
       setPhotoUrl(public_url);
@@ -112,6 +97,55 @@ export default function FirstOutfitScreen() {
       });
 
       animateToPhase('result');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to process outfit';
+      Alert.alert('Something went wrong', message);
+      animateToPhase('prompt');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Camera access needed',
+          'Please allow camera access in Settings to snap your outfit.',
+        );
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (pickerResult.canceled) return;
+      await processOutfitImage(pickerResult.assets[0].uri);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to process outfit';
+      Alert.alert('Something went wrong', message);
+      animateToPhase('prompt');
+    }
+  };
+
+  const handleChooseFromLibrary = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Photo library permission is required.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (pickerResult.canceled) return;
+      await processOutfitImage(pickerResult.assets[0].uri);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to process outfit';
       Alert.alert('Something went wrong', message);
@@ -162,6 +196,11 @@ export default function FirstOutfitScreen() {
 
           <Pressable style={styles.cameraButton} onPress={handleTakePhoto}>
             <Ionicons name="camera" size={36} color={colors.surface} />
+          </Pressable>
+
+          <Pressable style={styles.libraryButton} onPress={handleChooseFromLibrary}>
+            <Ionicons name="images-outline" size={20} color={colors.secondary} />
+            <Text style={styles.libraryButtonText}>Choose from Library</Text>
           </Pressable>
 
           <Text style={styles.hint}>
@@ -288,7 +327,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: spacing['4xl'],
+    marginBottom: spacing.lg,
+  },
+  libraryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing['2xl'],
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  libraryButtonText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.secondary,
   },
   hint: {
     fontFamily: fonts.inter.regular,

@@ -629,9 +629,13 @@ export async function getUserProfile(): Promise<ApiResponse<UserProfile>> {
 
 export interface CompleteOnboardingPayload {
   name: string;
-  style_archetypes?: Record<string, number>;
+  occasions?: string[];
+  liked_styles?: string[];
+  disliked_styles?: string[];
   color_season?: ColorSeason | null;
   skin_undertone?: 'warm' | 'cool' | 'neutral' | null;
+  /** @deprecated Use occasions + liked_styles + disliked_styles instead */
+  style_archetypes?: Record<string, number>;
 }
 
 export async function completeOnboarding(
