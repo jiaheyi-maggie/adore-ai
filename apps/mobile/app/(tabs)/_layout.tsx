@@ -105,6 +105,13 @@ export default function TabsLayout() {
           title: 'Add to Wishlist',
         }}
       />
+      <Tabs.Screen
+        name="batch-scan"
+        options={{
+          href: null,
+          title: 'Batch Scan',
+        }}
+      />
     </Tabs>
   );
 }

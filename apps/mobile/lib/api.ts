@@ -190,6 +190,61 @@ export async function scanItem(
   return result.data;
 }
 
+// ── Batch Scan API ──────────────────────────────────────────
+
+export interface BatchScanItem {
+  detection_id: string;
+  name: string;
+  box_2d: [number, number, number, number];
+  attributes: ItemAttributes;
+}
+
+export interface BatchScanResult {
+  scan_id: string;
+  items_detected: number;
+  items: BatchScanItem[];
+}
+
+export async function batchScan(
+  imageUrl: string
+): Promise<BatchScanResult> {
+  const result = await apiFetch<ApiResponse<BatchScanResult>>(
+    '/wardrobe/items/batch-scan',
+    {
+      method: 'POST',
+      body: JSON.stringify({ image_url: imageUrl }),
+    }
+  );
+  return result.data;
+}
+
+export interface BatchConfirmItem {
+  detection_id: string;
+  confirmed: boolean;
+  attributes_override?: Partial<ItemAttributes>;
+  name?: string;
+}
+
+export interface BatchConfirmResult {
+  created_items: WardrobeItem[];
+  confirmed_count: number;
+  rejected_count: number;
+}
+
+export async function batchConfirm(
+  scanId: string,
+  items: BatchConfirmItem[]
+): Promise<BatchConfirmResult> {
+  const result = await apiFetch<ApiResponse<BatchConfirmResult>>(
+    '/wardrobe/items/batch-confirm',
+    {
+      method: 'POST',
+      body: JSON.stringify({ scan_id: scanId, items }),
+    }
+  );
+  return result.data;
+}
+
 // ── Outfits API ─────────────────────────────────────────────
 
 /** Outfit with joined items from the API */

@@ -102,6 +102,13 @@ export default function WardrobeScreen() {
             <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.addButtonText}>Add Item</Text>
           </Pressable>
+          <Pressable
+            style={styles.batchScanButton}
+            onPress={() => router.push('/batch-scan')}
+          >
+            <Ionicons name="scan-outline" size={20} color={colors.secondary} />
+            <Text style={styles.batchScanButtonText}>Scan Closet</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -160,7 +167,27 @@ export default function WardrobeScreen() {
       {allItems.length > 0 && (
         <Pressable
           style={styles.fab}
-          onPress={() => router.push('/add-item')}
+          onPress={() => {
+            if (Platform.OS === 'ios') {
+              ActionSheetIOS.showActionSheetWithOptions(
+                {
+                  options: ['Cancel', 'Add Single Item', 'Batch Scan'],
+                  cancelButtonIndex: 0,
+                  title: 'Add to Wardrobe',
+                },
+                (buttonIndex) => {
+                  if (buttonIndex === 1) router.push('/add-item');
+                  if (buttonIndex === 2) router.push('/batch-scan');
+                }
+              );
+            } else {
+              Alert.alert('Add to Wardrobe', undefined, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Add Single Item', onPress: () => router.push('/add-item') },
+                { text: 'Batch Scan', onPress: () => router.push('/batch-scan') },
+              ]);
+            }
+          }}
         >
           <Ionicons name="add" size={28} color="#fff" />
         </Pressable>
@@ -229,6 +256,23 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontFamily: fonts.inter.medium,
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  batchScanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderColor: colors.secondary,
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 12,
+    gap: 8,
+  },
+  batchScanButtonText: {
+    fontFamily: fonts.inter.medium,
+    color: colors.secondary,
     fontSize: 16,
     fontWeight: '500',
   },
