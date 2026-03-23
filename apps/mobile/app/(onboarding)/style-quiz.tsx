@@ -421,6 +421,9 @@ export default function StyleQuizScreen() {
       const likedTags = collectTags(LIKED_STYLE_CARDS, likedStyles);
       const dislikedTags = collectTags(DISLIKED_STYLE_CARDS, dislikedStyles);
 
+      // Compute archetype weights from liked cards' style_tags for the DNA visualization
+      const archetypeMap = computeStyleArchetypes(LIKED_STYLE_CARDS, likedStyles);
+
       router.push({
         pathname: '/color-analysis',
         params: {
@@ -428,6 +431,7 @@ export default function StyleQuizScreen() {
           occasions: JSON.stringify(Array.from(selectedOccasions)),
           liked_styles: JSON.stringify(likedTags),
           disliked_styles: JSON.stringify(dislikedTags),
+          style_archetypes: JSON.stringify(archetypeMap),
         },
       });
     }
@@ -713,6 +717,59 @@ function collectTags(cards: StyleCard[], selectedIds: Set<string>): string[] {
     }
   }
   return Array.from(tagSet);
+}
+
+/**
+ * Compute style archetype weights from selected cards' style_tags.
+ * Mirrors the backend `computeStyleArchetypes` logic so the revelation screen
+ * can display the Style DNA without a round-trip.
+ */
+function computeStyleArchetypes(
+  cards: StyleCard[],
+  selectedIds: Set<string>,
+): Record<string, number> {
+  const archetypeKeywords: Record<string, string[]> = {
+    minimalist: ['minimalist', 'clean', 'refined', 'understated', 'monochrome'],
+    classic: ['classic', 'tailored', 'polished', 'preppy', 'collegiate', 'timeless'],
+    bohemian: ['boho', 'relaxed', 'beachy', 'coastal', 'natural', 'organic', 'earthy'],
+    edgy: ['edgy', 'rocker', 'bold', 'streetwear', 'urban', 'grunge', 'leather'],
+    romantic: ['romantic', 'feminine', 'soft', 'delicate'],
+    maximalist: ['maximalist', 'colorful', 'eclectic', 'bold-pattern', 'statement'],
+    glamorous: ['glamorous', 'sparkle', 'powerful', 'commanding', 'sharp', 'power'],
+    vintage: ['vintage', 'retro', 'nostalgic'],
+    cozy: ['cozy', 'layered', 'hygge', 'comfortable'],
+    athletic: ['athletic', 'sporty', 'athleisure'],
+  };
+
+  // Collect all style_tags from selected cards
+  const allStyleTags: string[] = [];
+  for (const card of cards) {
+    if (selectedIds.has(card.id)) {
+      for (const tag of card.tags.style_tags) {
+        allStyleTags.push(tag.toLowerCase());
+      }
+    }
+  }
+
+  // Score each archetype by counting keyword matches
+  const scores: Record<string, number> = {};
+  for (const [archetype, keywords] of Object.entries(archetypeKeywords)) {
+    let count = 0;
+    for (const keyword of keywords) {
+      if (allStyleTags.includes(keyword)) count++;
+    }
+    if (count > 0) scores[archetype] = count;
+  }
+
+  // Normalize to 0-1 range (matching backend behavior)
+  const total = Object.values(scores).reduce((sum, v) => sum + v, 0);
+  if (total > 0) {
+    for (const key of Object.keys(scores)) {
+      scores[key] = Math.round((scores[key] / total) * 100) / 100;
+    }
+  }
+
+  return scores;
 }
 
 // ── Progress Dots ───────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,81 @@ interface DetectedItemSummary {
   colors: { dominant: string; secondary: string[] };
 }
 
+interface ArchetypeEntry {
+  name: string;
+  label: string;
+  weight: number;
+  percent: number;
+}
+
+// ── Archetype display names ───────────────────────────────────
+const ARCHETYPE_LABELS: Record<string, string> = {
+  minimalist: 'Minimalist',
+  classic: 'Classic',
+  bohemian: 'Bohemian',
+  edgy: 'Edgy',
+  romantic: 'Romantic',
+  maximalist: 'Maximalist',
+  glamorous: 'Glamorous',
+  vintage: 'Vintage',
+  cozy: 'Cozy',
+  athletic: 'Athletic',
+};
+
+// ── Style DNA Bar Component ───────────────────────────────────
+
+function StyleDNABar({
+  entry,
+  index,
+}: {
+  entry: ArchetypeEntry;
+  index: number;
+}) {
+  const barWidth = useRef(new Animated.Value(0)).current;
+  const barOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const delay = index * 120;
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.timing(barOpacity, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(barWidth, {
+          toValue: entry.percent,
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+      ]),
+    ]).start();
+  }, [entry.percent, index]);
+
+  const animatedWidth = barWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <Animated.View style={[dnaStyles.row, { opacity: barOpacity }]}>
+      <Text style={dnaStyles.archetypeName}>{entry.label}</Text>
+      <View style={dnaStyles.barTrack}>
+        <Animated.View
+          style={[dnaStyles.barFill, { width: animatedWidth }]}
+        />
+      </View>
+      <Text style={dnaStyles.percentText}>{entry.percent}%</Text>
+    </Animated.View>
+  );
+}
+
+// ── Main Screen ───────────────────────────────────────────────
+
 export default function RevelationScreen() {
   const router = useRouter();
   const { refreshOnboardingStatus } = useAuth();
@@ -38,7 +113,6 @@ export default function RevelationScreen() {
     color_swatches: string;
     detected_items: string;
     photo_url: string;
-    // Legacy compat
     style_archetypes?: string;
   }>();
 
@@ -64,7 +138,7 @@ export default function RevelationScreen() {
     ]).start();
   }, []);
 
-  // Safe JSON parse — Expo Router params can be strings, arrays, or already-parsed
+  // Safe JSON parse -- Expo Router params can be strings, arrays, or already-parsed
   function safeParseArray<T = string>(value: string | string[] | undefined): T[] {
     if (!value) return [];
     if (Array.isArray(value)) return value as T[];
@@ -77,6 +151,19 @@ export default function RevelationScreen() {
     }
   }
 
+  function safeParseObject(value: string | string[] | undefined): Record<string, number> {
+    if (!value || Array.isArray(value)) return {};
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, number>;
+      }
+      return {};
+    } catch {
+      return {};
+    }
+  }
+
   const name = params.name || 'there';
   const occasions = safeParseArray(params.occasions);
   const likedStyles = safeParseArray(params.liked_styles);
@@ -86,12 +173,46 @@ export default function RevelationScreen() {
   const bestColors = safeParseArray(params.best_colors);
   const colorSwatches = safeParseArray(params.color_swatches);
   const detectedItems = safeParseArray<DetectedItemSummary>(params.detected_items);
+  const rawArchetypes = safeParseObject(params.style_archetypes);
 
-  // Derive a style label from liked style tags for the badge
-  const styleSummaryTag = likedStyles.length > 0 ? likedStyles[0] : null;
-  const archetypeLabel = styleSummaryTag
-    ? styleSummaryTag.charAt(0).toUpperCase() + styleSummaryTag.slice(1)
-    : null;
+  // ── Style DNA: convert archetype weights to sorted, filtered entries ──
+  const archetypeEntries = useMemo((): ArchetypeEntry[] => {
+    const entries = Object.entries(rawArchetypes);
+    if (entries.length === 0) return [];
+
+    // Convert weights (0-1) to percentages
+    const total = entries.reduce((sum, [, w]) => sum + w, 0);
+    if (total === 0) return [];
+
+    return entries
+      .map(([key, weight]) => ({
+        name: key,
+        label: ARCHETYPE_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1),
+        weight,
+        percent: Math.round((weight / total) * 100),
+      }))
+      .filter((e) => e.percent >= 5) // Filter out archetypes below 5%
+      .sort((a, b) => b.percent - a.percent);
+  }, [rawArchetypes]);
+
+  // ── AI Summary Sentence ──────────────────────────────────────
+  const styleSummary = useMemo((): string | null => {
+    if (archetypeEntries.length === 0) return null;
+
+    const top1 = archetypeEntries[0].label.toLowerCase();
+
+    if (archetypeEntries.length === 1) {
+      return `Your style is distinctly ${top1}.`;
+    }
+
+    const top2 = archetypeEntries[1].label.toLowerCase();
+    const top3 = archetypeEntries.length >= 3 ? archetypeEntries[2].label.toLowerCase() : null;
+
+    if (top3) {
+      return `You gravitate toward ${top1} with a strong ${top2} foundation, and touches of ${top3}.`;
+    }
+    return `You gravitate toward ${top1} with a strong ${top2} foundation.`;
+  }, [archetypeEntries]);
 
   // Color season display name
   const seasonLabel = colorSeason
@@ -118,7 +239,7 @@ export default function RevelationScreen() {
   const handleStartExploring = async () => {
     setIsCompleting(true);
     try {
-      // Validate color_season against the enum before sending — Gemini may have
+      // Validate color_season against the enum before sending -- Gemini may have
       // returned a format that doesn't match (e.g. "Cool Summer" vs "summer-cool").
       const validColorSeason =
         colorSeason && (COLOR_SEASONS as readonly string[]).includes(colorSeason)
@@ -169,48 +290,45 @@ export default function RevelationScreen() {
           {name}
         </Text>
 
-        {/* Badges section */}
-        <View style={styles.badgesRow}>
-          {/* Style Archetype Badge */}
-          {archetypeLabel && (
-            <View style={styles.badge}>
-              <View style={styles.badgeIcon}>
-                <Ionicons
-                  name="sparkles"
-                  size={22}
-                  color={colors.accent}
-                />
-              </View>
-              <Text style={styles.badgeLabel}>STYLE VIBE</Text>
-              <Text style={styles.badgeValue}>{archetypeLabel}</Text>
-            </View>
-          )}
+        {/* Style DNA Spectrum */}
+        {archetypeEntries.length > 0 && (
+          <View style={dnaStyles.container}>
+            <Text style={dnaStyles.header}>YOUR STYLE DNA</Text>
+            {archetypeEntries.map((entry, i) => (
+              <StyleDNABar key={entry.name} entry={entry} index={i} />
+            ))}
+          </View>
+        )}
 
-          {/* Color Season Badge */}
-          {seasonLabel && (
-            <View style={styles.badge}>
-              <View style={styles.badgeIcon}>
-                <Ionicons
-                  name="color-palette"
-                  size={22}
-                  color={colors.accent}
-                />
-              </View>
-              <Text style={styles.badgeLabel}>COLOR SEASON</Text>
-              <Text style={styles.badgeValue}>{seasonLabel}</Text>
-              {colorSwatches.length > 0 && (
-                <View style={styles.miniSwatchRow}>
-                  {colorSwatches.slice(0, 4).map((hex, i) => (
-                    <View
-                      key={i}
-                      style={[styles.miniSwatch, { backgroundColor: hex }]}
-                    />
-                  ))}
-                </View>
-              )}
+        {/* AI Summary Sentence */}
+        {styleSummary && (
+          <Text style={styles.summaryText}>{styleSummary}</Text>
+        )}
+
+        {/* Color Season Badge */}
+        {seasonLabel && (
+          <View style={styles.seasonBadge}>
+            <View style={styles.badgeIcon}>
+              <Ionicons
+                name="color-palette"
+                size={22}
+                color={colors.accent}
+              />
             </View>
-          )}
-        </View>
+            <Text style={styles.badgeLabel}>COLOR SEASON</Text>
+            <Text style={styles.badgeValue}>{seasonLabel}</Text>
+            {colorSwatches.length > 0 && (
+              <View style={styles.miniSwatchRow}>
+                {colorSwatches.slice(0, 4).map((hex, i) => (
+                  <View
+                    key={i}
+                    style={[styles.miniSwatch, { backgroundColor: hex }]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Detected items */}
         {detectedItems.length > 0 && (
@@ -258,6 +376,64 @@ export default function RevelationScreen() {
   );
 }
 
+// ── Style DNA styles ──────────────────────────────────────────
+
+const dnaStyles = StyleSheet.create({
+  container: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  header: {
+    fontFamily: fonts.cormorant.semibold,
+    fontSize: 14,
+    letterSpacing: 2,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  archetypeName: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textPrimary,
+    width: 85,
+  },
+  barTrack: {
+    flex: 1,
+    height: 10,
+    backgroundColor: colors.border,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 5,
+  },
+  percentText: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    width: 36,
+    textAlign: 'right',
+  },
+});
+
+// ── Main styles ───────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
@@ -280,13 +456,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing['3xl'],
   },
-  badgesRow: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginBottom: spacing['3xl'],
+  summaryText: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 15,
+    fontStyle: 'italic',
+    color: colors.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing['2xl'],
   },
-  badge: {
-    flex: 1,
+  seasonBadge: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
     borderWidth: 1,
@@ -294,6 +474,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
     gap: spacing.sm,
+    alignSelf: 'center',
+    minWidth: 160,
+    marginBottom: spacing['2xl'],
   },
   badgeIcon: {
     width: 44,
