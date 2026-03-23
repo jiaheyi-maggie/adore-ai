@@ -50,6 +50,7 @@ export default function HangerScanScreen() {
   const queryClient = useQueryClient();
   const cameraRef = useRef<CameraView>(null);
   const captureTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
 
   const [step, setStep] = useState<FlowStep>('instructions');
@@ -65,11 +66,16 @@ export default function HangerScanScreen() {
   // Flash animation for capture feedback
   const flashOpacity = useRef(new Animated.Value(0)).current;
 
-  // Clean up timer on unmount
+  // Clean up timers on unmount
   useEffect(() => {
     return () => {
+      if (startDelayRef.current) {
+        clearTimeout(startDelayRef.current);
+        startDelayRef.current = null;
+      }
       if (captureTimerRef.current) {
         clearInterval(captureTimerRef.current);
+        captureTimerRef.current = null;
       }
     };
   }, []);
@@ -127,7 +133,8 @@ export default function HangerScanScreen() {
     setStep('scanning');
 
     // Start auto-capture interval after a brief delay for camera to initialize
-    setTimeout(() => {
+    startDelayRef.current = setTimeout(() => {
+      startDelayRef.current = null;
       captureTimerRef.current = setInterval(() => {
         captureFrame();
       }, CAPTURE_INTERVAL_MS);
@@ -135,6 +142,10 @@ export default function HangerScanScreen() {
   }, [permission, requestPermission, captureFrame]);
 
   const stopScanning = useCallback(() => {
+    if (startDelayRef.current) {
+      clearTimeout(startDelayRef.current);
+      startDelayRef.current = null;
+    }
     if (captureTimerRef.current) {
       clearInterval(captureTimerRef.current);
       captureTimerRef.current = null;
@@ -225,9 +236,8 @@ export default function HangerScanScreen() {
             text: 'Retry',
             onPress: () => processCaptures(uris),
           },
-          { text: 'Cancel', onPress: () => setStep('instructions') },
+          { text: 'Cancel', onPress: () => setStep('instructions'), style: 'cancel' },
         ]);
-        setStep('instructions');
       }
     },
     []

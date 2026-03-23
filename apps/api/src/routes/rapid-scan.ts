@@ -71,7 +71,7 @@ async function fetchImageSafe(
 // ── Zod schemas ─────────────────────────────────────────────
 
 const rapidScanSchema = z.object({
-  image_urls: z.array(z.string().url()).min(1).max(200),
+  image_urls: z.array(z.string().url()).min(1).max(80),
 });
 
 const singleDetectionSchema = z.object({
@@ -167,6 +167,24 @@ interface DetectedItemWithUrl {
 }
 
 /**
+ * Check whether two detected items represent the same garment based on
+ * category + dominant color + subcategory word overlap.
+ */
+function isSameGarment(a: DetectedItem, b: DetectedItem): boolean {
+  if (a.category !== b.category) return false;
+  if (a.colors.dominant.toLowerCase() !== b.colors.dominant.toLowerCase())
+    return false;
+  if (a.subcategory != null && b.subcategory != null) {
+    const aWords = new Set(a.subcategory.toLowerCase().split(/\s+/));
+    const bWords = new Set(b.subcategory.toLowerCase().split(/\s+/));
+    const intersection = [...aWords].filter((w) => bWords.has(w));
+    const unionSize = new Set([...aWords, ...bWords]).size;
+    if (unionSize > 0 && intersection.length / unionSize < 0.3) return false;
+  }
+  return true;
+}
+
+/**
  * Simple attribute-based deduplication: if two items share the same
  * category + dominant color + similar subcategory, they are likely
  * the same garment photographed from adjacent frames. Keep the one
@@ -178,49 +196,15 @@ function deduplicateItems(
   const unique: DetectedItemWithUrl[] = [];
 
   for (const candidate of items) {
-    const isDuplicate = unique.some((existing) => {
-      // Must match category
-      if (existing.item.category !== candidate.item.category) return false;
-
-      // Must match dominant color (case-insensitive)
-      if (
-        existing.item.colors.dominant.toLowerCase() !==
-        candidate.item.colors.dominant.toLowerCase()
-      )
-        return false;
-
-      // Subcategory similarity: if both have subcategories, they should match
-      // or one should be null (meaning we can't tell)
-      if (
-        existing.item.subcategory !== null &&
-        candidate.item.subcategory !== null
-      ) {
-        const existingSub = existing.item.subcategory.toLowerCase();
-        const candidateSub = candidate.item.subcategory.toLowerCase();
-        // Check if they share significant words (more than 50% overlap)
-        const existingWords = new Set(existingSub.split(/\s+/));
-        const candidateWords = new Set(candidateSub.split(/\s+/));
-        const intersection = [...existingWords].filter((w) =>
-          candidateWords.has(w)
-        );
-        const unionSize = new Set([...existingWords, ...candidateWords]).size;
-        if (unionSize > 0 && intersection.length / unionSize < 0.3) {
-          return false; // subcategories too different
-        }
-      }
-
-      return true; // duplicate
-    });
+    const isDuplicate = unique.some((existing) =>
+      isSameGarment(existing.item, candidate.item)
+    );
 
     if (isDuplicate) {
       // Replace existing if candidate has higher confidence
-      const existingIndex = unique.findIndex((existing) => {
-        return (
-          existing.item.category === candidate.item.category &&
-          existing.item.colors.dominant.toLowerCase() ===
-            candidate.item.colors.dominant.toLowerCase()
-        );
-      });
+      const existingIndex = unique.findIndex((existing) =>
+        isSameGarment(existing.item, candidate.item)
+      );
       if (
         existingIndex !== -1 &&
         candidate.item.confidence > unique[existingIndex].item.confidence
@@ -301,40 +285,54 @@ rapidScan.post(
       );
     }
 
-    // Step 2: Process each image in parallel through Gemini
-    const results = await Promise.allSettled(
-      image_urls.map(async (url, index) => {
-        const { base64, mimeType } = await fetchImageSafe(url);
+    // Step 2: Process images through Gemini in batches to avoid OOM and rate limits
+    const BATCH_SIZE = 8;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { inlineData: { mimeType, data: base64 } },
-                { text: HANGER_SCAN_PROMPT },
-              ],
-            },
-          ],
-        });
+    async function processFrame(url: string, index: number) {
+      const { base64, mimeType } = await fetchImageSafe(url);
 
-        const text = response.text?.trim();
-        if (!text) throw new Error('No response from Gemini');
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType, data: base64 } },
+              { text: HANGER_SCAN_PROMPT },
+            ],
+          },
+        ],
+      });
 
-        let jsonStr = text;
-        if (jsonStr.startsWith('```')) {
-          jsonStr = jsonStr
-            .replace(/^```(?:json)?\n?/, '')
-            .replace(/\n?```$/, '');
-        }
+      const text = response.text?.trim();
+      if (!text) throw new Error('No response from Gemini');
 
-        const parsed = JSON.parse(jsonStr);
-        const validated = singleDetectionSchema.parse(parsed);
+      let jsonStr = text;
+      if (jsonStr.startsWith('```')) {
+        jsonStr = jsonStr
+          .replace(/^```(?:json)?\n?/, '')
+          .replace(/\n?```$/, '');
+      }
 
-        return { item: validated, imageUrl: url, frameIndex: index };
-      })
-    );
+      const parsed = JSON.parse(jsonStr);
+      const validated = singleDetectionSchema.parse(parsed);
+
+      return { item: validated, imageUrl: url, frameIndex: index };
+    }
+
+    const results: PromiseSettledResult<{
+      item: DetectedItem;
+      imageUrl: string;
+      frameIndex: number;
+    }>[] = [];
+
+    for (let i = 0; i < image_urls.length; i += BATCH_SIZE) {
+      const batch = image_urls.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((url, batchIndex) => processFrame(url, i + batchIndex))
+      );
+      results.push(...batchResults);
+    }
 
     // Collect successful detections, skip failures
     const detectedItems: DetectedItemWithUrl[] = [];
