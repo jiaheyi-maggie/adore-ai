@@ -17,7 +17,7 @@ import { completeOnboarding } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { COLOR_SEASONS } from '@adore/shared';
 import type { ColorSeason, StyleProfile } from '@adore/shared';
-import StyleAuraNative from '../../components/StyleAuraNative';
+import StyleRadar from '../../components/StyleRadar';
 import { computeStyleDimensions, DEFAULT_DIMENSIONS } from '../../lib/style-dimensions';
 
 interface DetectedItemSummary {
@@ -321,16 +321,10 @@ export default function RevelationScreen() {
           {name}
         </Text>
 
-        {/* Style Aura Blob — the "wow" moment */}
-        <View style={styles.auraContainer}>
-          <StyleAuraNative
-            primaryColor={auraDimensions.primaryColor}
-            secondaryColor={auraDimensions.secondaryColor}
-            accentColor={auraDimensions.accentColor}
-            complexity={auraDimensions.complexity}
-            structure={auraDimensions.structure}
-            size={200}
-          />
+        {/* Style Radar — the "wow" moment */}
+        <View style={styles.radarContainer}>
+          <Text style={styles.radarHeader}>YOUR STYLE SIGNATURE</Text>
+          <StyleRadar dimensions={auraDimensions} size={240} showLabels={true} />
           <Text style={styles.auraLabel}>{auraDimensions.archetypeName}</Text>
         </View>
 
@@ -500,9 +494,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing['2xl'],
   },
-  auraContainer: {
+  radarContainer: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  radarHeader: {
+    fontFamily: fonts.cormorant.semibold,
+    fontSize: 14,
+    letterSpacing: 2,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
   },
   auraLabel: {
     fontFamily: fonts.cormorant.semibold,
