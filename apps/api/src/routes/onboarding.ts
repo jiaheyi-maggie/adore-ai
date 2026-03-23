@@ -64,6 +64,7 @@ onboarding.post(
       .eq('id', userId);
 
     if (userError) {
+      console.error('User update failed:', userError.message, userError.details, userError.hint);
       return c.json(
         { data: null, error: { code: 'UPDATE_FAILED', message: userError.message } },
         400,
@@ -102,6 +103,8 @@ onboarding.post(
         .eq('user_id', userId);
 
       if (profileError) {
+        console.error('Profile update failed:', profileError.message, profileError.details, profileError.hint);
+        console.error('Profile updates attempted:', JSON.stringify(profileUpdates));
         return c.json(
           { data: null, error: { code: 'PROFILE_UPDATE_FAILED', message: profileError.message } },
           400,
