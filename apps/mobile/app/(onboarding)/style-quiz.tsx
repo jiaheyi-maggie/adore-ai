@@ -135,7 +135,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'preppy',
-    icon: 'bowtie-outline',
+    icon: 'school-outline',
     label: 'Preppy + polished',
     tags: {
       categories: ['tops', 'bottoms', 'outerwear'],
@@ -147,7 +147,7 @@ const LIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'romantic-soft',
-    icon: 'rose-outline',
+    icon: 'heart-outline',
     label: 'Romantic + soft',
     tags: {
       categories: ['dresses', 'tops'],
@@ -282,7 +282,7 @@ const DISLIKED_STYLE_CARDS: StyleCard[] = [
   },
   {
     id: 'frilly-ruffles',
-    icon: 'ribbon-outline',
+    icon: 'gift-outline',
     label: 'Lots of frills + ruffles',
     tags: {
       categories: ['dresses', 'tops'],
