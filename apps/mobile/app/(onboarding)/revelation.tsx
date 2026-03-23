@@ -64,27 +64,28 @@ export default function RevelationScreen() {
     ]).start();
   }, []);
 
+  // Safe JSON parse — Expo Router params can be strings, arrays, or already-parsed
+  function safeParseArray<T = string>(value: string | string[] | undefined): T[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value as T[];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      // If it's a single comma-separated string or just a plain string
+      return typeof value === 'string' ? (value.split(',').filter(Boolean) as T[]) : [];
+    }
+  }
+
   const name = params.name || 'there';
-  const occasions: string[] = params.occasions
-    ? JSON.parse(params.occasions)
-    : [];
-  const likedStyles: string[] = params.liked_styles
-    ? JSON.parse(params.liked_styles)
-    : [];
-  const dislikedStyles: string[] = params.disliked_styles
-    ? JSON.parse(params.disliked_styles)
-    : [];
+  const occasions = safeParseArray(params.occasions);
+  const likedStyles = safeParseArray(params.liked_styles);
+  const dislikedStyles = safeParseArray(params.disliked_styles);
   const colorSeason = params.color_season || null;
   const skinUndertone = params.skin_undertone || null;
-  const bestColors: string[] = params.best_colors
-    ? JSON.parse(params.best_colors)
-    : [];
-  const colorSwatches: string[] = params.color_swatches
-    ? JSON.parse(params.color_swatches)
-    : [];
-  const detectedItems: DetectedItemSummary[] = params.detected_items
-    ? JSON.parse(params.detected_items)
-    : [];
+  const bestColors = safeParseArray(params.best_colors);
+  const colorSwatches = safeParseArray(params.color_swatches);
+  const detectedItems = safeParseArray<DetectedItemSummary>(params.detected_items);
 
   // Derive a style label from liked style tags for the badge
   const styleSummaryTag = likedStyles.length > 0 ? likedStyles[0] : null;
