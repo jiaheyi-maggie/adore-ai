@@ -87,6 +87,12 @@ export default function ProfileScreen() {
           label="Style DNA"
           badge={hasStyleProfile ? dimensions.archetypeName : 'Not set'}
         />
+        <MenuItem
+          icon="compass-outline"
+          label="Explore a New Direction"
+          badge="Style Shifting"
+          onPress={() => router.push('/style-shift')}
+        />
         <MenuItem icon="wallet-outline" label="Budget" badge="Not set" />
         <MenuItem icon="flag-outline" label="Style Goals" badge="0 active" />
         <MenuItem icon="stats-chart-outline" label="Wardrobe Analytics" />

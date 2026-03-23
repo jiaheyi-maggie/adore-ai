@@ -824,3 +824,174 @@ export interface StyleDimensionsResponse {
 export async function getStyleDimensions(): Promise<ApiResponse<StyleDimensionsResponse>> {
   return apiFetch<ApiResponse<StyleDimensionsResponse>>('/auth/profile/style-dimensions');
 }
+
+// ── Style Shifting API ────────────────────────────────────────
+
+export interface ArchetypePresetResponse {
+  id: string;
+  name: string;
+  description: string;
+  archetypes: Record<string, number>;
+  signature: {
+    colors: string[];
+    materials: string[];
+    patterns: string[];
+    formality_range: [number, number];
+    style_tags: string[];
+    favored_categories: string[];
+  };
+}
+
+export interface ClassifiedItem {
+  item: {
+    id: string;
+    name: string;
+    category: string;
+    colors: string[];
+    material: string | null;
+    pattern: string;
+    formality_level: number;
+    image_url: string | null;
+    image_url_clean: string | null;
+    brand: string | null;
+  };
+  score: number;
+  reason: string;
+}
+
+export interface ClassifiedWardrobe {
+  target_aligned: ClassifiedItem[];
+  bridge: ClassifiedItem[];
+  neutral: ClassifiedItem[];
+  phase_out: ClassifiedItem[];
+}
+
+export interface DimensionDelta {
+  current: number;
+  target: number;
+  delta: number;
+}
+
+export interface PhaseScheduleItem {
+  phase: number;
+  label: string;
+  weeks: string;
+  blend_ratio: { current: number; target: number };
+}
+
+export interface StyleShiftGoal {
+  id: string;
+  user_id: string;
+  goal_type: string;
+  title: string;
+  description: string;
+  target_state: Record<string, unknown>;
+  current_progress: number;
+  deadline: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateShiftResponse {
+  goal: StyleShiftGoal;
+  classification: ClassifiedWardrobe;
+  dimension_deltas: Record<string, DimensionDelta>;
+  phase_schedule: PhaseScheduleItem[];
+  wardrobe_item_count: number;
+  message?: string;
+}
+
+export interface ShiftAnalysisResponse {
+  goal: StyleShiftGoal;
+  classification: ClassifiedWardrobe;
+  dimension_deltas: Record<string, DimensionDelta>;
+  phase_schedule: PhaseScheduleItem[];
+  progress_pct: number;
+  wardrobe_item_count: number;
+}
+
+export interface BridgeOutfit {
+  name: string;
+  item_ids: string[];
+  items: Array<{
+    id: string;
+    name: string;
+    category: string;
+    colors: string[];
+    image_url: string | null;
+    image_url_clean: string | null;
+  }>;
+  styling_note: string;
+  target_score: number;
+  comfort_score: number;
+}
+
+export interface ShoppingListItem {
+  name: string;
+  price: number;
+  currency: string;
+  source_url: string;
+  image_url: string;
+  retailer: string;
+  category: string;
+  outfit_unlock_estimate: number;
+  happiness_prediction: number;
+  leverage_score: number;
+}
+
+export interface ShoppingListResponse {
+  shopping_list: ShoppingListItem[];
+  total_investment: number;
+  gaps_identified?: number;
+  message?: string;
+}
+
+export async function getStylePresets(): Promise<ApiResponse<ArchetypePresetResponse[]>> {
+  return apiFetch<ApiResponse<ArchetypePresetResponse[]>>('/style-goals/presets');
+}
+
+export async function createStyleShift(data: {
+  target_preset_id?: string;
+  target_description?: string;
+  intensity: 'taste' | 'explore' | 'transform';
+  title?: string;
+}): Promise<ApiResponse<CreateShiftResponse>> {
+  return apiFetch<ApiResponse<CreateShiftResponse>>('/style-goals/shift', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getShiftAnalysis(
+  goalId: string
+): Promise<ApiResponse<ShiftAnalysisResponse>> {
+  return apiFetch<ApiResponse<ShiftAnalysisResponse>>(`/style-goals/${goalId}/analysis`);
+}
+
+export async function getBridgeOutfits(
+  goalId: string,
+  count: number = 5
+): Promise<ApiResponse<{ outfits: BridgeOutfit[]; message?: string }>> {
+  return apiFetch<ApiResponse<{ outfits: BridgeOutfit[]; message?: string }>>(
+    `/style-goals/${goalId}/bridge-outfits`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ count }),
+    }
+  );
+}
+
+export async function getShiftShoppingList(
+  goalId: string,
+  maxItems: number = 5,
+  budgetMax?: number
+): Promise<ApiResponse<ShoppingListResponse>> {
+  return apiFetch<ApiResponse<ShoppingListResponse>>(
+    `/style-goals/${goalId}/shopping-list`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ max_items: maxItems, budget_max: budgetMax }),
+    }
+  );
+}

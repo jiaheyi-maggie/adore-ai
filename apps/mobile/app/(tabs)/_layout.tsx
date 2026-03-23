@@ -119,6 +119,13 @@ export default function TabsLayout() {
           title: 'Closet Scan',
         }}
       />
+      <Tabs.Screen
+        name="style-shift"
+        options={{
+          href: null,
+          title: 'Style Shifting',
+        }}
+      />
     </Tabs>
   );
 }

@@ -14,6 +14,7 @@ import stylistRoutes from './routes/stylist';
 import marketplaceRoutes from './routes/marketplace';
 import wishlistRoutes from './routes/wishlist';
 import onboardingRoutes from './routes/onboarding';
+import styleShiftRoutes from './routes/style-shift';
 
 const app = new Hono();
 
@@ -54,6 +55,7 @@ app.route('/stylist', stylistRoutes);
 app.route('/marketplace', marketplaceRoutes);
 app.route('/wishlist', wishlistRoutes);
 app.route('/auth', onboardingRoutes);
+app.route('/style-goals', styleShiftRoutes);
 
 const port = Number(process.env.PORT) || 3000;
 
