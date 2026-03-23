@@ -103,7 +103,7 @@ function StyleDNABar({
 
 export default function RevelationScreen() {
   const router = useRouter();
-  const { refreshOnboardingStatus } = useAuth();
+  const { refreshOnboardingStatus, user } = useAuth();
   const params = useLocalSearchParams<{
     name: string;
     occasions: string;
@@ -334,7 +334,7 @@ export default function RevelationScreen() {
             secondaryColor={auraDimensions.secondaryColor}
             accentColor={auraDimensions.accentColor}
             size={200}
-            seed={name}
+            seed={user?.id || name}
           />
           <Text style={styles.auraLabel}>{auraDimensions.archetypeName}</Text>
         </View>

@@ -43,9 +43,11 @@ export default function StyleCard({
       }
 
       // Capture the card as PNG
+      // Note: Skia Canvas renders to a separate GPU surface. If ViewShot
+      // cannot capture it, we fall through to the error handler.
       const uri = await viewShotRef.current?.capture?.();
       if (!uri) {
-        Alert.alert('Error', 'Failed to capture card image.');
+        Alert.alert('Screenshot instead', 'Take a screenshot to share your Style Card.');
         return;
       }
 
@@ -65,7 +67,7 @@ export default function StyleCard({
         ref={viewShotRef}
         options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}
       >
-        <View style={styles.card}>
+        <View style={styles.card} collapsable={false}>
           {/* User name at top */}
           <Text style={styles.userName} numberOfLines={1}>
             {userName}

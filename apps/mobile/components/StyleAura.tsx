@@ -128,7 +128,7 @@ function generateBlobPath(config: BlobConfig): ReturnType<typeof Skia.Path.Make>
   const path = Skia.Path.Make();
 
   // Calculate control points for smooth curves using Catmull-Rom to Bezier conversion
-  const tension = 0.3 + structure * 0.4; // higher structure = tighter curves
+  const tension = 0.7 - structure * 0.4; // high structure = angular/geometric, low = smooth/organic
 
   for (let i = 0; i < pointCount; i++) {
     const p0 = points[(i - 1 + pointCount) % pointCount];
