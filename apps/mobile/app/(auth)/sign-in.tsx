@@ -29,13 +29,18 @@ export default function SignInScreen() {
     }
 
     setIsLoading(true);
-    const { error } = await signIn(email.trim().toLowerCase(), password);
-    setIsLoading(false);
-
-    if (error) {
-      Alert.alert('Sign in failed', error);
+    try {
+      const { error } = await signIn(email.trim().toLowerCase(), password);
+      if (error) {
+        Alert.alert('Sign in failed', error);
+      }
+      // On success, auth state change triggers navigation automatically
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+      Alert.alert('Sign in failed', message);
+    } finally {
+      setIsLoading(false);
     }
-    // On success, auth state change triggers navigation automatically
   };
 
   return (
