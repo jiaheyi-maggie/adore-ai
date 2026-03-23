@@ -16,7 +16,9 @@ import { colors, fonts, radii, spacing } from '../../lib/theme';
 import { completeOnboarding } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { COLOR_SEASONS } from '@adore/shared';
-import type { ColorSeason } from '@adore/shared';
+import type { ColorSeason, StyleProfile } from '@adore/shared';
+import StyleAura from '../../components/StyleAura';
+import { computeStyleDimensions, DEFAULT_DIMENSIONS } from '../../lib/style-dimensions';
 
 interface DetectedItemSummary {
   description: string;
@@ -175,6 +177,35 @@ export default function RevelationScreen() {
   const detectedItems = safeParseArray<DetectedItemSummary>(params.detected_items);
   const rawArchetypes = safeParseObject(params.style_archetypes);
 
+  // ── Aura dimensions: compute from available data ──────────────────────
+  const auraDimensions = useMemo(() => {
+    if (Object.keys(rawArchetypes).length === 0 && !colorSeason) {
+      return DEFAULT_DIMENSIONS;
+    }
+
+    // Build a partial StyleProfile from the onboarding data we have
+    const partialProfile: StyleProfile = {
+      id: '',
+      user_id: '',
+      color_season: colorSeason && (COLOR_SEASONS as readonly string[]).includes(colorSeason)
+        ? (colorSeason as ColorSeason)
+        : null,
+      skin_undertone: (skinUndertone as 'warm' | 'cool' | 'neutral') ?? null,
+      style_archetypes: rawArchetypes,
+      color_preferences: {},
+      formality_distribution: { casual: 0.3, smart_casual: 0.3, business: 0.2, formal: 0.1, black_tie: 0.1 },
+      brand_affinities: {},
+      price_range: { min: 0, max: 0, sweet_spot: 0 },
+      avoided_styles: [],
+      body_metrics: null,
+      taste_vector: null,
+      created_at: '',
+      updated_at: '',
+    };
+
+    return computeStyleDimensions(partialProfile);
+  }, [rawArchetypes, colorSeason, skinUndertone]);
+
   // ── Style DNA: convert archetype weights to sorted, filtered entries ──
   const archetypeEntries = useMemo((): ArchetypeEntry[] => {
     const entries = Object.entries(rawArchetypes);
@@ -289,6 +320,24 @@ export default function RevelationScreen() {
           Welcome to Adore,{'\n'}
           {name}
         </Text>
+
+        {/* Style Aura Blob — the "wow" moment */}
+        <View style={styles.auraContainer}>
+          <StyleAura
+            colorTemp={auraDimensions.colorTemp}
+            saturation={auraDimensions.saturation}
+            structure={auraDimensions.structure}
+            complexity={auraDimensions.complexity}
+            formality={auraDimensions.formality}
+            riskTolerance={auraDimensions.riskTolerance}
+            primaryColor={auraDimensions.primaryColor}
+            secondaryColor={auraDimensions.secondaryColor}
+            accentColor={auraDimensions.accentColor}
+            size={200}
+            seed={name}
+          />
+          <Text style={styles.auraLabel}>{auraDimensions.archetypeName}</Text>
+        </View>
 
         {/* Style DNA Spectrum */}
         {archetypeEntries.length > 0 && (
@@ -454,7 +503,19 @@ const styles = StyleSheet.create({
     fontSize: 36,
     color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: spacing['3xl'],
+    marginBottom: spacing['2xl'],
+  },
+  auraContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  auraLabel: {
+    fontFamily: fonts.cormorant.semibold,
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
   summaryText: {
     fontFamily: fonts.inter.regular,

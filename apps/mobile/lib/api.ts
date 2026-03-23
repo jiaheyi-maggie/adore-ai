@@ -670,3 +670,23 @@ export async function analyzeColors(
     }
   );
 }
+
+// ── Style Dimensions API ────────────────────────────────────
+
+export interface StyleDimensionsResponse {
+  colorTemp: number;
+  saturation: number;
+  structure: number;
+  complexity: number;
+  formality: number;
+  riskTolerance: number;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  archetypeName: string;
+  traits: string[];
+}
+
+export async function getStyleDimensions(): Promise<ApiResponse<StyleDimensionsResponse>> {
+  return apiFetch<ApiResponse<StyleDimensionsResponse>>('/auth/profile/style-dimensions');
+}

@@ -263,6 +263,201 @@ onboarding.get('/profile', async (c) => {
   });
 });
 
+// ── GET /auth/profile/style-dimensions — Compute aura dimensions ──
+
+onboarding.get('/profile/style-dimensions', async (c) => {
+  const supabase = c.get('supabase');
+  const userId = c.get('userId');
+
+  const { data: styleProfile, error } = await supabase
+    .from('style_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !styleProfile) {
+    return c.json(
+      { data: null, error: { code: 'NOT_FOUND', message: 'Style profile not found' } },
+      404,
+    );
+  }
+
+  const dimensions = computeStyleDimensionsServer(styleProfile);
+  return c.json({ data: dimensions, error: null });
+});
+
+// ── Server-side style dimension computation ─────────────────
+
+interface StyleDimensionsResult {
+  colorTemp: number;
+  saturation: number;
+  structure: number;
+  complexity: number;
+  formality: number;
+  riskTolerance: number;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  archetypeName: string;
+  traits: string[];
+}
+
+const SEASON_PALETTES: Record<string, [string, string, string]> = {
+  'spring-light': ['#F5C882', '#F7A8B8', '#B8D4A8'],
+  'spring-warm': ['#E8A44A', '#D4764E', '#7BAA6E'],
+  'spring-clear': ['#FF8C42', '#FF6B6B', '#FFD93D'],
+  'summer-light': ['#A8C5D6', '#C4A8C9', '#D6C4A8'],
+  'summer-cool': ['#7B9EC4', '#9B7BB5', '#B8C9D4'],
+  'summer-soft': ['#B5A3C4', '#C9A8B5', '#A3B5C4'],
+  'autumn-warm': ['#C47B3F', '#8B5E3C', '#6B7B3F'],
+  'autumn-deep': ['#8B3A3A', '#5C3D2E', '#3D5C4E'],
+  'autumn-soft': ['#B59B7A', '#8B7B6B', '#7B8B6B'],
+  'winter-cool': ['#4A6FA5', '#6B4F8A', '#2D4A5E'],
+  'winter-deep': ['#2D1B4E', '#4A0E2E', '#0E2E4A'],
+  'winter-clear': ['#E60012', '#0039A6', '#FFFFFF'],
+};
+
+const SEASON_WARMTH: Record<string, number> = {
+  spring: 0.85, summer: 0.25, autumn: 0.9, winter: 0.15,
+};
+const MODIFIER_WARMTH: Record<string, number> = {
+  warm: 0.15, light: 0.05, clear: 0.0, cool: -0.15, soft: -0.05, deep: -0.05,
+};
+
+const DIM_STRUCTURE: Record<string, number> = {
+  minimalist: 0.7, classic: 0.85, bohemian: 0.15, edgy: 0.55, romantic: 0.25,
+  maximalist: 0.35, glamorous: 0.75, vintage: 0.45, cozy: 0.1, athletic: 0.6,
+};
+const DIM_COMPLEXITY: Record<string, number> = {
+  minimalist: 0.1, classic: 0.25, bohemian: 0.65, edgy: 0.7, romantic: 0.5,
+  maximalist: 0.95, glamorous: 0.7, vintage: 0.55, cozy: 0.2, athletic: 0.15,
+};
+const DIM_RISK: Record<string, number> = {
+  minimalist: 0.2, classic: 0.1, bohemian: 0.55, edgy: 0.9, romantic: 0.3,
+  maximalist: 0.85, glamorous: 0.65, vintage: 0.45, cozy: 0.05, athletic: 0.15,
+};
+
+const TRAIT_MAP: Record<string, string[]> = {
+  minimalist: ['Clean Lines', 'Less Is More', 'Intentional'],
+  classic: ['Timeless', 'Polished', 'Tailored'],
+  bohemian: ['Free-Spirited', 'Textured', 'Earthy'],
+  edgy: ['Statement-Making', 'Rule-Breaking', 'Fearless'],
+  romantic: ['Soft', 'Feminine', 'Graceful'],
+  maximalist: ['Bold Prints', 'Color-Fearless', 'Layered'],
+  glamorous: ['Luxe', 'Commanding', 'Refined'],
+  vintage: ['Retro', 'Nostalgic', 'Curated'],
+  cozy: ['Comfort-First', 'Layered', 'Relaxed'],
+  athletic: ['Functional', 'Sporty', 'Dynamic'],
+};
+
+const ARCHETYPE_DISPLAY: Record<string, string> = {
+  minimalist: 'Minimalist', classic: 'Classic', bohemian: 'Bohemian',
+  edgy: 'Edgy', romantic: 'Romantic', maximalist: 'Maximalist',
+  glamorous: 'Glamorous', vintage: 'Vintage', cozy: 'Cozy', athletic: 'Athletic',
+};
+
+function computeStyleDimensionsServer(profile: {
+  color_season?: string | null;
+  style_archetypes?: Record<string, number> | null;
+  formality_distribution?: Record<string, number> | null;
+  color_preferences?: Record<string, number> | null;
+}): StyleDimensionsResult {
+  const { color_season, style_archetypes, formality_distribution } = profile;
+
+  // Color temperature
+  let colorTemp = 0.5;
+  if (color_season) {
+    const [base, mod] = color_season.split('-');
+    colorTemp = Math.max(0, Math.min(1,
+      (SEASON_WARMTH[base] ?? 0.5) + (MODIFIER_WARMTH[mod] ?? 0),
+    ));
+  }
+
+  // Saturation (simplified server-side: derive from season depth)
+  let saturation = 0.5;
+  if (color_season) {
+    const mod = color_season.split('-')[1];
+    if (mod === 'clear' || mod === 'deep') saturation = 0.7;
+    else if (mod === 'soft' || mod === 'light') saturation = 0.35;
+  }
+
+  // Structure, complexity, risk from archetypes
+  let structure = 0.5;
+  let complexity = 0.3;
+  let riskTolerance = 0.3;
+  const archetypeEntries = Object.entries(style_archetypes ?? {});
+  if (archetypeEntries.length > 0) {
+    const total = archetypeEntries.reduce((s, [, w]) => s + w, 0);
+    if (total > 0) {
+      structure = 0; complexity = 0; riskTolerance = 0;
+      for (const [a, w] of archetypeEntries) {
+        const n = w / total;
+        structure += (DIM_STRUCTURE[a] ?? 0.5) * n;
+        complexity += (DIM_COMPLEXITY[a] ?? 0.5) * n;
+        riskTolerance += (DIM_RISK[a] ?? 0.3) * n;
+      }
+    }
+  }
+
+  // Formality
+  let formality = 0.35;
+  const fWeights: Record<string, number> = {
+    casual: 0.1, smart_casual: 0.3, business: 0.6, formal: 0.8, black_tie: 1.0,
+  };
+  if (formality_distribution) {
+    let ws = 0; let td = 0;
+    for (const [l, d] of Object.entries(formality_distribution)) {
+      ws += (fWeights[l] ?? 0.5) * d;
+      td += d;
+    }
+    if (td > 0) formality = ws / td;
+  }
+
+  // Colors
+  let primaryColor = '#C4956A';
+  let secondaryColor = '#B3845A';
+  let accentColor = '#E8D5C4';
+  if (color_season && SEASON_PALETTES[color_season]) {
+    [primaryColor, secondaryColor, accentColor] = SEASON_PALETTES[color_season];
+  }
+
+  // Archetype name
+  const sorted = archetypeEntries.sort((a, b) => b[1] - a[1]);
+  const topKey = sorted[0]?.[0] ?? 'classic';
+  const topLabel = ARCHETYPE_DISPLAY[topKey] ?? 'Classic';
+  let colorAdj = 'Balanced';
+  if (color_season) {
+    const base = color_season.split('-')[0];
+    if (base === 'spring') colorAdj = 'Warm';
+    else if (base === 'summer') colorAdj = 'Cool';
+    else if (base === 'autumn') colorAdj = 'Rich';
+    else if (base === 'winter') colorAdj = 'Bold';
+  } else if (colorTemp > 0.65) colorAdj = 'Warm';
+  else if (colorTemp < 0.35) colorAdj = 'Cool';
+
+  // Traits
+  const traits: string[] = [];
+  const used = new Set<string>();
+  for (const [a] of sorted) {
+    for (const t of (TRAIT_MAP[a] ?? [])) {
+      if (!used.has(t) && traits.length < 3) { traits.push(t); used.add(t); }
+    }
+    if (traits.length >= 3) break;
+  }
+  if (traits.length < 4) {
+    if (formality >= 0.6) traits.push('Event-Ready');
+    else if (formality <= 0.25) traits.push('Effortlessly Casual');
+    else traits.push('Versatile');
+  }
+
+  return {
+    colorTemp, saturation, structure, complexity, formality, riskTolerance,
+    primaryColor, secondaryColor, accentColor,
+    archetypeName: `${colorAdj} ${topLabel}`,
+    traits,
+  };
+}
+
 // ── Server-side computation helpers ─────────────────────────
 
 /** Map style tags to archetype categories and compute weighted scores. */
