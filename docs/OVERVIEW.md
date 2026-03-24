@@ -123,7 +123,7 @@ This reframes the entire product from "wardrobe organizer" to **"personal optimi
 - Fashion-interested but not fashion-obsessed — wants to look good, not become a fashion blogger
 - The pain is both financial (wasted money on duplicates, impulse purchases) and emotional (decision fatigue, guilt cycle)
 
-### Secondary Persona: Marcus
+### Persona 2: Marcus — "Just Tell Me What to Wear"
 
 **Demographics:** 30-40, tech professional, $120K-$250K income. Minimal fashion interest but wants to "look put together."
 
@@ -133,7 +133,124 @@ This reframes the entire product from "wardrobe organizer" to **"personal optimi
 - Buys the same things repeatedly because he doesn't know what else to get
 - Would happily pay for something that tells him exactly what to wear each day
 
-**Why Marcus matters:** He represents the "fashion-unaware" market — people who want the output (looking good) without the process (learning about fashion). For Marcus, the AI stylist IS the product. He won't use outfit journals or style analytics. He wants: "What do I wear today?" answered in 3 seconds. His happiness function is simpler (comfort, appropriateness, low effort) but equally valid.
+**Core features:** AI Stylist ("What should I wear today?" answered in 3 seconds), outfit suggestions, hanger flip scan (lowest-effort onboarding). He won't use outfit journals or style analytics. His happiness function is simpler (comfort, appropriateness, low effort) but equally valid.
+
+**Why Marcus matters:** He represents the "fashion-unaware" market — people who want the output (looking good) without the process. This is a massive, underserved segment. Men's wardrobe app usage is growing 22% YoY.
+
+### Persona 3: Jess — "The Style Shifter"
+
+**Demographics:** 24-32, at a life inflection point — new job, post-breakup, turning 30, moving cities, post-grad entering the workforce.
+
+**Behavior:**
+- Knows their current style isn't who they want to be anymore
+- Pins hundreds of outfits on Pinterest but can't bridge from inspiration to action
+- Buys 2-3 "new direction" pieces that sit unworn because they don't fit the rest of the wardrobe
+- Has spent $500+ on failed style experiments
+- Searches "how to find your style" on TikTok/YouTube regularly
+
+**Hair-on-fire moment:** Just got a new corporate job. Owns 150 items of college-casual clothing. Needs to look professional in 2 weeks. No idea what to keep, what to buy, or how to build a work wardrobe from scratch.
+
+**Core features:** Style Shifting (the KILLER feature for Jess — "I want to explore polished professional" → wardrobe reclassified → bridge outfits from what she owns → targeted shopping list). Also: Aspiration Gap visualization, shopping list ranked by outfit-unlock leverage.
+
+**Why Jess matters:** Highest willingness-to-pay persona. Style transitions trigger spending ($1,200+ average wardrobe refresh). Jess is actively looking for guidance and will pay $9.99/month without hesitation if the shift plan works.
+
+### Persona 4: Diana — "The Overconsumer"
+
+**Demographics:** 25-40, any income level. Shops as emotional coping — stress, boredom, social media influence.
+
+**Behavior:**
+- Buys 3-5 items per week, returns 30-40%
+- Closet is overflowing but she "has nothing to wear"
+- Feels guilt after every purchase, then shops again to feel better
+- Has tried budgeting apps but they don't understand fashion-specific spending
+- Follows 50+ fashion influencers, screenshots ads constantly
+
+**Hair-on-fire moment:** Bank statement shows $2,400 in clothing purchases last month. Wore 12 of her 200+ items. Knows this is a problem but has no system to change it.
+
+**Core features:** Happiness Function anti-impulse engine ("Your predicted happiness for this is 2.8/10 — you own 6 similar items"), budget tracker with happiness-per-dollar efficiency, cost-per-wear analytics, "Would you buy this again?" swipe feature. The app becomes a behavioral mirror — showing the gap between impulse decisions and actual satisfaction.
+
+**Why Diana matters:** She represents the highest-engagement user. She opens the app every time she's about to buy something. The anti-impulse feature saves her real money, creating intense gratitude and loyalty. She tells everyone about it.
+
+### Persona 5: Leila — "The Sustainable Shopper"
+
+**Demographics:** 22-35, environmentally conscious, middle income. Buys secondhand and invests in quality.
+
+**Behavior:**
+- Actively trying to reduce fast fashion consumption
+- Shops at thrift stores, Depop, The RealReal
+- Wants a capsule wardrobe but can't figure out the optimal set
+- Tracks cost-per-wear manually in a spreadsheet
+- Sells items she no longer wears but hates the listing process
+
+**Hair-on-fire moment:** Owns a mix of 80 thrifted items and 20 quality investments. Wants to pare down to a 40-item capsule but doesn't know which 40. Needs to sell the other 60 but the thought of photographing, describing, and listing each one is overwhelming.
+
+**Core features:** Marketplace one-tap sell (the wardrobe data IS the listing — photo, brand, condition already cataloged), capsule wardrobe optimization (Style Shifting toward "Scandinavian Minimal" or "Clean Minimalist" preset), cost-per-wear leaderboard, sustainability score, wardrobe analytics showing category breakdown + rarely-worn items.
+
+**Why Leila matters:** The secondhand fashion market is $317B and growing. Leila is the bridge between wardrobe intelligence and commerce. Every item she sells through Adore is monetizable (listing fees or affiliate revenue on the replacement purchase).
+
+### Persona 6: Tomás — "The Busy Parent"
+
+**Demographics:** 30-45, dual-income household with kids. Used to care about style, now has zero bandwidth.
+
+**Behavior:**
+- Gets dressed in under 90 seconds
+- Owns the same 5 rotation outfits (the "mom uniform" or "dad uniform")
+- Hasn't bought new clothes for himself/herself in 6+ months
+- Feels invisible and wants to feel like a person again, not just a parent
+- Would use an app that requires less than 30 seconds of daily effort
+
+**Hair-on-fire moment:** Company holiday party this Saturday. Hasn't thought about what to wear. Opens closet and panics. Needs an answer in 2 minutes, not a styling session.
+
+**Core features:** Hanger flip scan (fastest onboarding — scan entire closet in 10 min without disrupting anything), "Tonight Mode" outfit suggestions (occasion + weather aware, only items currently accessible), AI stylist for quick answers. The 5-second daily interaction budget: snap outfit, get one insight, done.
+
+**Why Tomás matters:** Largest potential market by volume. Parents aged 30-45 are the biggest clothing purchasers by household spend. They're underserved because every fashion app assumes you have time and interest. Adore's passive intelligence (learns from what you wear, suggests without effort) is built for Tomás.
+
+### Persona 7: Anika — "The Fashion Student / Creator"
+
+**Demographics:** 18-26, fashion or design student, low income but high style literacy.
+
+**Behavior:**
+- Knows exactly what she likes but can't afford it
+- Thrifts aggressively and does DIY alterations
+- Uses fashion as identity expression — changes aesthetic every few months
+- Creates outfit content for Instagram/TikTok
+- Tracks trends professionally and wants to experiment
+
+**Hair-on-fire moment:** Wants to create a "dark academia to coastal grandmother transition" series for TikTok. Needs to plan 15 outfits that tell a visual story of aesthetic evolution — using only what she owns plus a $50 budget.
+
+**Core features:** Style Shifting with extreme precision (she knows the archetypes already — she needs the wardrobe analysis and bridge outfits), shareable Style DNA radar cards (content for her social media), outfit journal as a styling portfolio, product matching to find affordable dupes.
+
+**Why Anika matters:** She's the organic growth engine. Fashion-literate users create content about tools they love. One TikTok of Anika using Style Shifting to plan a content series = thousands of downloads. Her willingness to pay is low ($0-5/month) but her distribution value is enormous.
+
+### Persona 8: Robert — "The Wardrobe Investor"
+
+**Demographics:** 35-55, high income ($200K+), buys quality. Fewer items, higher price points.
+
+**Behavior:**
+- Owns 60-80 items, average cost $200+
+- Buys 2-3 items per season, carefully considered
+- Thinks about cost-per-wear before purchasing
+- Values fit, fabric, and construction over trends
+- Has a tailor and a preferred brand list
+
+**Hair-on-fire moment:** Considering a $800 cashmere overcoat. Wants to know: does it pair with enough of my wardrobe to justify the price? What's the projected cost-per-wear? Is this a gap I actually have?
+
+**Core features:** Happiness Function (the $800 coat scores 8.7/10 — fills a gap, pairs with 18 existing items, projected $3.20/wear), wardrobe analytics (category breakdown, versatility scores), budget tracker not for constraint but for optimization.
+
+**Why Robert matters:** Highest ARPU persona. He'll pay $19.99/month for premium without blinking. He wants intelligence, not entertainment. He's the user who proves the Happiness Function works — his purchases are intentional enough that the predictions are verifiable.
+
+### Persona Summary
+
+| Persona | Age | Income | Primary Feature | Willingness to Pay | Growth Value |
+|---------|-----|--------|----------------|-------------------|-------------|
+| **Priya** (fashion-interested pro) | 26-35 | $80-180K | Everything | $9.99/mo | Medium |
+| **Marcus** (tell me what to wear) | 30-40 | $120-250K | AI Stylist | $9.99/mo | Low |
+| **Jess** (style shifter) | 24-32 | $50-120K | Style Shifting | $9.99/mo | High |
+| **Diana** (overconsumer) | 25-40 | Any | Anti-impulse | $9.99/mo | High (word of mouth) |
+| **Leila** (sustainable) | 22-35 | $50-100K | Marketplace sell | $4.99/mo | Medium |
+| **Tomás** (busy parent) | 30-45 | $100-200K | Quick suggestions | $9.99/mo | Medium (volume) |
+| **Anika** (fashion creator) | 18-26 | $20-50K | Style Shifting + sharing | Free-$4.99 | Very High (content) |
+| **Robert** (wardrobe investor) | 35-55 | $200K+ | Happiness Function | $19.99/mo | Low (but high ARPU) |
 
 ---
 
