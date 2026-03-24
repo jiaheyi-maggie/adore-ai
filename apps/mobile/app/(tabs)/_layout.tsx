@@ -24,12 +24,13 @@ export default function TabsLayout() {
         headerShadowVisible: false,
       }}
     >
+      {/* ── Visible Tabs (5) ────────────────────────── */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Wardrobe',
+          title: 'Today',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shirt-outline" size={size} color={color} />
+            <Ionicons name="star-outline" size={size} color={color} />
           ),
         }}
       />
@@ -69,7 +70,14 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* Hidden screens — accessed via navigation, not tabs */}
+      {/* ── Hidden screens — accessed via navigation, not tabs ── */}
+      <Tabs.Screen
+        name="wardrobe"
+        options={{
+          href: null,
+          title: 'Wardrobe',
+        }}
+      />
       <Tabs.Screen
         name="add-item"
         options={{

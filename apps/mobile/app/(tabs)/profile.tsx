@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -7,9 +7,18 @@ import { listListings, getUserProfile } from '../../lib/api';
 import { colors, fonts, spacing, radii } from '../../lib/theme';
 import { computeStyleDimensions, DEFAULT_DIMENSIONS } from '../../lib/style-dimensions';
 import StyleRadarCard from '../../components/StyleRadarCard';
+import { useAuth } from '../../lib/auth-context';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { signOut } = useAuth();
+
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
+    ]);
+  };
 
   // Fetch active listings to show count badge
   const { data: activeListingsData } = useQuery<PaginatedResponse<MarketplaceListing>>({
@@ -97,6 +106,14 @@ export default function ProfileScreen() {
         <MenuItem icon="flag-outline" label="Style Goals" badge="0 active" />
         <MenuItem icon="stats-chart-outline" label="Wardrobe Analytics" />
         <MenuItem icon="leaf-outline" label="Sustainability Score" />
+
+        {/* Sign Out */}
+        <View style={styles.signOutSection}>
+          <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+            <Ionicons name="log-out-outline" size={20} color={colors.error} />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </Pressable>
+        </View>
       </View>
     </ScrollView>
   );
@@ -196,5 +213,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.inter.regular,
     fontSize: 13,
     color: colors.textMuted,
+  },
+  signOutSection: {
+    marginTop: spacing['2xl'],
+    paddingTop: spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+  },
+  signOutText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.error,
   },
 });

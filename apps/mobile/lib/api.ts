@@ -447,6 +447,85 @@ export async function getWeatherForLocation(
   }
 }
 
+// ── Outfit Suggestions API ──────────────────────────────────
+
+export interface SuggestOutfitsParams {
+  occasion?: OccasionType | null;
+  weather?: WeatherContext | null;
+  lat?: number;
+  lon?: number;
+  mood?: string | null;
+  style_shift_goal_id?: string | null;
+  count?: number;
+}
+
+export interface SuggestedOutfitItem {
+  id: string;
+  name: string;
+  category: string;
+  colors: string[];
+  image_url: string | null;
+  image_url_clean: string | null;
+  formality_level: number;
+  brand: string | null;
+}
+
+export interface SuggestedOutfit {
+  id: string;
+  name: string;
+  items: SuggestedOutfitItem[];
+  score: number;
+  happiness_estimate: number;
+  styling_note: string;
+  hero_item_id: string;
+  occasion: OccasionType | null;
+  weather: WeatherContext | null;
+}
+
+export interface SuggestOutfitsResponse {
+  data: SuggestedOutfit[];
+  error: null;
+  message?: string;
+}
+
+export async function suggestOutfits(
+  params: SuggestOutfitsParams
+): Promise<SuggestOutfitsResponse> {
+  return apiFetch<SuggestOutfitsResponse>('/outfits/suggest', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export interface TodayContext {
+  user_name: string | null;
+  weather: WeatherContext | null;
+  time_of_day: 'morning' | 'afternoon' | 'evening';
+  is_weekend: boolean;
+  inferred_occasion: OccasionType;
+  active_style_goal: {
+    id: string;
+    title: string;
+    description: string;
+    current_progress: number;
+  } | null;
+  wardrobe_item_count: number;
+  date: string;
+}
+
+export async function getTodayContext(
+  lat?: number,
+  lon?: number
+): Promise<ApiResponse<TodayContext>> {
+  const params = new URLSearchParams();
+  if (lat != null) params.set('lat', String(lat));
+  if (lon != null) params.set('lon', String(lon));
+  const qs = params.toString();
+  return apiFetch<ApiResponse<TodayContext>>(
+    `/outfits/today-context${qs ? `?${qs}` : ''}`
+  );
+}
+
 // ── Marketplace API ─────────────────────────────────────────
 
 export interface ListListingsParams {
