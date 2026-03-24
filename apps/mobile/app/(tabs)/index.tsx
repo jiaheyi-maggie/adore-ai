@@ -100,12 +100,36 @@ function OutfitCard({
             </View>
           ))
         ) : (
-          <View style={cardStyles.noImageContainer}>
-            <Ionicons
-              name="shirt-outline"
-              size={48}
-              color={colors.textMuted}
-            />
+          <View style={cardStyles.itemChipsGrid}>
+            {outfit.items.slice(0, 6).map((item) => {
+              const categoryIcons: Record<string, string> = {
+                tops: 'shirt-outline',
+                bottoms: 'resize-outline',
+                dresses: 'flower-outline',
+                outerwear: 'snow-outline',
+                shoes: 'footsteps-outline',
+                accessories: 'watch-outline',
+                bags: 'bag-outline',
+                jewelry: 'diamond-outline',
+                activewear: 'barbell-outline',
+              };
+              const iconName = categoryIcons[item.category] ?? 'ellipse-outline';
+              const dominantColor = item.colors?.[0] ?? 'gray';
+              return (
+                <View key={item.id} style={cardStyles.itemChip}>
+                  <Ionicons name={iconName as any} size={18} color={colors.secondary} />
+                  <Text style={cardStyles.itemChipName} numberOfLines={1}>
+                    {item.name.split(' ').slice(0, 3).join(' ')}
+                  </Text>
+                  <View
+                    style={[
+                      cardStyles.colorDot,
+                      { backgroundColor: dominantColor === 'white' ? '#f0f0f0' : dominantColor === 'black' ? '#2D2926' : dominantColor === 'navy' ? '#1a3a5c' : dominantColor === 'cream' ? '#f5f0e8' : dominantColor === 'khaki' ? '#c3b091' : dominantColor === 'camel' ? '#c19a6b' : dominantColor === 'indigo' ? '#3f51b5' : dominantColor === 'nude' ? '#e3bc9a' : dominantColor === 'tan' ? '#d2b48c' : dominantColor === 'gold' ? '#d4a04a' : dominantColor === 'dusty-rose' ? '#c9a0a0' : colors.textMuted },
+                    ]}
+                  />
+                </View>
+              );
+            })}
           </View>
         )}
       </View>
@@ -596,6 +620,38 @@ const cardStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.accentSoft,
+  },
+  itemChipsGrid: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.accentSoft,
+    padding: spacing.lg,
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  itemChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    gap: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  itemChipName: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textPrimary,
+    maxWidth: 160,
+  },
+  colorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   moreOverlay: {
     ...StyleSheet.absoluteFillObject,
