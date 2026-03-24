@@ -943,17 +943,53 @@ These three compound. The persistent context makes the happiness function accura
 
 ## 13. The Moat
 
-### Short-term Moat (Year 1): Product Completeness
-The unified lifecycle (scan → style → buy → sell → evolve) is a product moat. Any competitor who adds one feature still lacks the others. Building the full system takes 12+ months. By the time they catch up, Adore has a data advantage.
+### Feature Moats (Built, Shipping Now)
 
-### Medium-term Moat (Year 2-3): Behavioral Data
+**1. The Happiness Function (Personalized Purchase Prediction)**
+An 8-component weighted reward model `H(item, user, context) → [0-10]` that predicts how much joy a purchase will bring. Trained on behavioral data: what you actually wear, skip, return, rate. No competitor has this. Every fashion company wants you to buy more — Adore tells you whether you *should* buy it, with data-backed reasoning. The weights calibrate per-user over time, creating a switching cost that grows with usage.
+
+**2. Style Shifting (Guided Aesthetic Evolution)**
+Zero competitors. User says "I want to explore boho" → Adore reclassifies their entire wardrobe into target-aligned / bridge / neutral / phase-out buckets, generates bridge outfits from owned items only, and produces a ranked shopping list scored by outfit-unlock leverage × happiness / price. 12 archetype presets, 3 intensity levels (taste/explore/transform), phased progression over 12 weeks. This is GPS for your aesthetic identity — the feature that turns a wardrobe app into a style transformation engine.
+
+**3. Three-Tier Wardrobe Scanning (Cold Start Solved)**
+The #1 killer of wardrobe apps is onboarding friction (photographing 150 items). Adore solved it three ways:
+- **Batch Photo "Closet Dump"**: Lay 8+ items flat, one overhead photo, Gemini detects all with bounding boxes. ~45 seconds for 8 items.
+- **Hanger Flip Rapid Scan**: Stand in front of open closet, slide hangers. Camera auto-captures every 2.5s with haptic feedback. ~50 items in 10 minutes, nothing leaves the closet.
+- **Passive Outfit Journal**: Daily outfit snap decomposes into individual items via AI. Wardrobe builds itself — 2-5 new items per day, zero dedicated scanning time.
+
+Combined: 80-120 items on Day 1 in ~20 minutes, 90%+ coverage by Day 30.
+
+**4. Style DNA Radar (6-Axis Visual Identity)**
+Each user gets a unique hexagonal radar chart mapping 6 style dimensions (Structure, Complexity, Risk, Formality, Warmth, Energy). Different people produce visibly different polygon shapes. Shareable as an Instagram Stories card with archetype name + trait labels. This is the "Spotify Wrapped for fashion" moment — the thing people screenshot and share.
+
+**5. Product Matching (Auto-Find Items Online)**
+After Gemini extracts item attributes, Adore automatically searches Google Shopping (via Serper API) to find the actual product. Shows price, retailer, and buy link. Non-blocking (3s deadline) so scans never slow down. Graceful degradation when no match found.
+
+**6. AI Stylist with Persistent Memory**
+Conversational AI that knows your entire wardrobe, remembers past preferences across sessions ("I told you I don't like yellow"), and builds context from 5 sources: style profile, wardrobe inventory, recent outfits, agent memories, and weather. Not a stateless chatbot — a genuine long-term relationship.
+
+**7. One-Tap Marketplace Sell**
+Long-press any wardrobe item → AI generates listing package (title, description, price suggestion with breakdown) optimized per platform (Depop/Poshmark/eBay/Mercari). Copy to clipboard, list in 30 seconds. Closes the wardrobe lifecycle: acquire → organize → style → evolve → sell → acquire better.
+
+**8. Full Happiness-Aware Wishlist**
+Every wishlist item gets a happiness score prediction with expandable reasoning. Anti-impulse warnings: "Items you discover via social media score 3.1 on average. Items from wardrobe gap analysis score 7.8." Budget tracker with monthly spending efficiency (happiness-per-dollar).
+
+### Structural Moats
+
+**Short-term (Year 1): Product Completeness**
+The unified lifecycle (scan → style → shift → buy → sell → evolve) is a product moat. Any competitor who adds one feature still lacks the others. Building the full system takes 12+ months. By the time they catch up, Adore has a data advantage.
+
+**Medium-term (Year 2-3): Behavioral Data**
 After 6 months of daily use, Adore has a user's complete taste graph — what they wear, what they buy, what they sell, how they feel about each decision. This data is non-transferable. No competing app can import it. No new app starts with it. The switching cost is total.
 
-### Long-term Moat (Year 3+): Taste Intelligence Network
+**Long-term (Year 3+): Taste Intelligence Network**
 At scale (1M+ users), the aggregated taste data enables collaborative filtering that no smaller competitor can match. "Users with your taste graph who bought X wore it 40 times and rated it 8.7/10." This prediction quality scales with network size.
 
-### Structural Moat: Incentive Alignment
+**Structural: Incentive Alignment**
 Every fashion company — Zara, Shein, Amazon, Instagram — wants you to **buy more.** Adore wants you to **buy better.** This creates a structural moat: big tech will never build a product that tells users to buy less, because their business model depends on transaction volume. Adore's business model depends on user trust and subscription retention, which aligns with the user's actual interest.
+
+**Structural: Social Without Social**
+Adore deliberately does NOT build a social network. Social creates performative data that pollutes the Happiness Function. Instead: shareable Style Cards (distribution), anonymous collaborative filtering (intelligence), and Pinterest import (aspiration signals). The Spotify playbook: taste graph + sharing + collaborative filtering, NOT feeds + follows + likes.
 
 ---
 
