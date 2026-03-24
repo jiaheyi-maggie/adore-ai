@@ -37,33 +37,39 @@ const INTENSITY_RATIOS: Record<Intensity, { current: number; target: number }> =
 
 // ── Phase schedule by intensity ────────────────────────────
 
+const PHASE_SCHEDULES: Record<Intensity, Array<{ blend_ratio: { current: number; target: number } }>> = {
+  taste: [
+    { blend_ratio: { current: 0.9, target: 0.1 } },
+    { blend_ratio: { current: 0.85, target: 0.15 } },
+    { blend_ratio: { current: 0.8, target: 0.2 } },
+  ],
+  explore: [
+    { blend_ratio: { current: 0.8, target: 0.2 } },
+    { blend_ratio: { current: 0.6, target: 0.4 } },
+    { blend_ratio: { current: 0.6, target: 0.4 } },
+  ],
+  transform: [
+    { blend_ratio: { current: 0.6, target: 0.4 } },
+    { blend_ratio: { current: 0.4, target: 0.6 } },
+    { blend_ratio: { current: 0.3, target: 0.7 } },
+  ],
+};
+
+const PHASE_LABELS = ['Taste', 'Explore', 'Settle'] as const;
+const PHASE_WEEKS = ['Weeks 1-4', 'Weeks 5-8', 'Weeks 9-12'] as const;
+
 function buildPhaseSchedule(intensity: Intensity): Array<{
   phase: number;
   label: string;
   weeks: string;
   blend_ratio: { current: number; target: number };
 }> {
-  const base = INTENSITY_RATIOS[intensity];
-  return [
-    {
-      phase: 1,
-      label: 'Taste',
-      weeks: 'Weeks 1-4',
-      blend_ratio: { current: 0.8, target: 0.2 },
-    },
-    {
-      phase: 2,
-      label: 'Explore',
-      weeks: 'Weeks 5-8',
-      blend_ratio: { current: 0.6, target: 0.4 },
-    },
-    {
-      phase: 3,
-      label: 'Settle',
-      weeks: 'Weeks 9-12',
-      blend_ratio: base,
-    },
-  ];
+  return PHASE_SCHEDULES[intensity].map((entry, i) => ({
+    phase: i + 1,
+    label: PHASE_LABELS[i],
+    weeks: PHASE_WEEKS[i],
+    blend_ratio: entry.blend_ratio,
+  }));
 }
 
 // ── Validation Schemas ──────────────────────────────────────
@@ -765,11 +771,11 @@ styleShift.post(
           (bridgeItemCount * 0.6 + targetAlignedCount * 0.8) * 0.3
         ));
 
-        // Simple happiness prediction based on alignment + price
-        // Higher score for items that fill a gap in a key aesthetic category
-        const happinessPrediction = Math.round(
-          (6 + (gaps.length > 3 ? 1.5 : 0.5) + Math.random() * 1.5) * 10
-        ) / 10;
+        // Deterministic happiness prediction based on attribute match count
+        const matchScore = (product.name.toLowerCase().includes(result.category.toLowerCase()) ? 0.5 : 0) +
+          (targetPreset.signature.colors.some(c => product.name.toLowerCase().includes(c)) ? 0.5 : 0) +
+          (gaps.length > 3 ? 0.5 : 0);
+        const happinessPrediction = Math.round((6 + matchScore) * 10) / 10;
 
         const price = product.price || 1;
         const leverageScore = Math.round(

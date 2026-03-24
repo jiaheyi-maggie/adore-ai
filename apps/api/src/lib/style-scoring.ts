@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import type { WardrobeItem, ItemCategory, Pattern, Material } from '@adore/shared';
-import { ARCHETYPE_PRESETS, type ArchetypePreset } from './archetype-presets';
+import { type ArchetypePreset } from './archetype-presets';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ const COLOR_FAMILIES: Record<string, string[]> = {
   orange: ['orange', 'burnt orange', 'terracotta', 'rust', 'coral', 'peach', 'apricot'],
   yellow: ['yellow', 'mustard', 'gold', 'saffron', 'lemon', 'amber'],
   green: ['green', 'olive', 'sage', 'forest green', 'emerald', 'muted green', 'hunter', 'moss', 'jade'],
-  purple: ['purple', 'lavender', 'plum', 'violet', 'lilac', 'mauve', 'amethyst'],
+  purple: ['purple', 'lavender', 'plum', 'violet', 'lilac', 'amethyst'],
   turquoise: ['turquoise', 'teal', 'aqua', 'cyan'],
   fuchsia: ['fuchsia', 'magenta', 'hot pink', 'neon pink'],
 };
@@ -247,19 +247,36 @@ export function classifyWardrobe(
   return result;
 }
 
+// ── Base Archetype Signatures ───────────────────────────────
+// Maps the 10 base archetype names (as stored in user style_archetypes)
+// to their attribute signatures. These are distinct from the compound
+// preset IDs (e.g. "clean-minimalist") in archetype-presets.ts.
+
+const BASE_ARCHETYPE_SIGNATURES: Record<string, { colors: string[]; materials: string[]; patterns: string[]; formality_range: [number, number]; categories: string[]; style_tags: string[] }> = {
+  minimalist: { colors: ['black', 'white', 'grey', 'beige'], materials: ['cotton', 'linen', 'wool'], patterns: ['solid'], formality_range: [2, 4], categories: ['tops', 'bottoms'], style_tags: ['clean', 'simple', 'understated'] },
+  classic: { colors: ['navy', 'white', 'cream', 'camel'], materials: ['cotton', 'wool', 'cashmere'], patterns: ['solid', 'striped'], formality_range: [3, 5], categories: ['outerwear', 'tops', 'bottoms'], style_tags: ['timeless', 'polished', 'refined'] },
+  bohemian: { colors: ['brown', 'rust', 'cream', 'turquoise'], materials: ['linen', 'cotton', 'suede', 'leather'], patterns: ['floral', 'abstract', 'geometric'], formality_range: [1, 3], categories: ['dresses', 'accessories', 'jewelry'], style_tags: ['free-spirited', 'earthy', 'layered'] },
+  edgy: { colors: ['black', 'dark-grey', 'burgundy'], materials: ['leather', 'denim', 'synthetic'], patterns: ['solid', 'graphic'], formality_range: [1, 3], categories: ['outerwear', 'shoes', 'accessories'], style_tags: ['bold', 'rebellious', 'statement'] },
+  romantic: { colors: ['blush', 'lavender', 'cream', 'dusty-rose'], materials: ['silk', 'lace', 'chiffon'], patterns: ['floral', 'solid'], formality_range: [2, 4], categories: ['dresses', 'tops', 'jewelry'], style_tags: ['feminine', 'soft', 'delicate'] },
+  maximalist: { colors: ['multi', 'bright', 'saturated'], materials: ['velvet', 'silk', 'synthetic'], patterns: ['abstract', 'geometric', 'animal-print'], formality_range: [1, 4], categories: ['dresses', 'accessories', 'jewelry'], style_tags: ['bold', 'eclectic', 'layered'] },
+  glamorous: { colors: ['gold', 'silver', 'black', 'red'], materials: ['silk', 'velvet', 'synthetic'], patterns: ['solid'], formality_range: [3, 5], categories: ['dresses', 'jewelry', 'shoes'], style_tags: ['luxe', 'statement', 'sparkle'] },
+  vintage: { colors: ['mustard', 'burgundy', 'teal', 'rust'], materials: ['cotton', 'denim', 'wool'], patterns: ['plaid', 'polka-dot', 'floral'], formality_range: [2, 3], categories: ['dresses', 'tops', 'accessories'], style_tags: ['retro', 'nostalgic', 'character'] },
+  cozy: { colors: ['cream', 'oatmeal', 'camel', 'grey'], materials: ['wool', 'cashmere', 'knit', 'cotton'], patterns: ['solid', 'striped'], formality_range: [1, 2], categories: ['tops', 'outerwear'], style_tags: ['comfortable', 'warm', 'relaxed'] },
+  athletic: { colors: ['black', 'grey', 'white', 'neon'], materials: ['synthetic', 'cotton', 'nylon'], patterns: ['solid', 'graphic'], formality_range: [1, 2], categories: ['activewear', 'shoes'], style_tags: ['sporty', 'functional', 'dynamic'] },
+};
+
 // ── Current-Style Synthetic Preset ──────────────────────────
 
 /**
  * Builds a lightweight synthetic ArchetypePreset from the user's current archetype weights.
- * This lets us score items against the user's current style for bridge/phase-out classification.
+ * Uses BASE_ARCHETYPE_SIGNATURES (keyed by base names like "minimalist", "classic")
+ * instead of ARCHETYPE_PRESETS (keyed by compound IDs like "clean-minimalist").
  */
 function buildCurrentPreset(
   archetypes: Record<string, number>
 ): ArchetypePreset | null {
   const entries = Object.entries(archetypes).filter(([, w]) => w > 0);
   if (entries.length === 0) return null;
-
-  const presetMap = new Map(ARCHETYPE_PRESETS.map((p) => [p.id, p]));
 
   const totalWeight = entries.reduce((sum, [, w]) => sum + w, 0);
   const blendedColors: string[] = [];
@@ -272,20 +289,18 @@ function buildCurrentPreset(
 
   for (const [archName, weight] of entries) {
     const norm = weight / totalWeight;
-    // Try to find a matching preset. Archetype names from user profiles
-    // (minimalist, classic, bohemian, etc.) map to presets by convention
-    const preset = presetMap.get(archName);
-    if (!preset) continue;
+    const sig = BASE_ARCHETYPE_SIGNATURES[archName];
+    if (!sig) continue;
 
     // Take top N items proportional to weight
     const take = Math.max(1, Math.round(norm * 5));
-    blendedColors.push(...preset.signature.colors.slice(0, take));
-    blendedMaterials.push(...preset.signature.materials.slice(0, take));
-    blendedPatterns.push(...preset.signature.patterns.slice(0, take));
-    blendedTags.push(...preset.signature.style_tags.slice(0, take));
-    blendedCategories.push(...preset.signature.favored_categories.slice(0, take));
-    formalityLow = Math.min(formalityLow, preset.signature.formality_range[0]);
-    formalityHigh = Math.max(formalityHigh, preset.signature.formality_range[1]);
+    blendedColors.push(...sig.colors.slice(0, take));
+    blendedMaterials.push(...sig.materials.slice(0, take));
+    blendedPatterns.push(...sig.patterns.slice(0, take));
+    blendedTags.push(...sig.style_tags.slice(0, take));
+    blendedCategories.push(...(sig.categories.slice(0, take) as ItemCategory[]));
+    formalityLow = Math.min(formalityLow, sig.formality_range[0]);
+    formalityHigh = Math.max(formalityHigh, sig.formality_range[1]);
   }
 
   return {

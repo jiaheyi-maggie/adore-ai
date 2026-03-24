@@ -10,6 +10,7 @@ import {
   Image,
   FlatList,
   Linking,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -108,6 +109,9 @@ export default function StyleShiftScreen() {
       setShiftResult(data);
       setStep('closet-reseen');
     },
+    onError: (err) => {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    },
   });
 
   // Bridge outfits mutation
@@ -119,6 +123,9 @@ export default function StyleShiftScreen() {
     onSuccess: (data) => {
       setBridgeOutfits(data.outfits ?? []);
       setStep('bridge-outfits');
+    },
+    onError: (err) => {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     },
   });
 
@@ -132,6 +139,9 @@ export default function StyleShiftScreen() {
       setShoppingList(data.shopping_list ?? []);
       setTotalInvestment(data.total_investment ?? 0);
       setStep('shopping-list');
+    },
+    onError: (err) => {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     },
   });
 
