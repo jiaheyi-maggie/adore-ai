@@ -252,9 +252,9 @@ function getIntentWeights(intent: StylingIntent): ScoringWeights {
     case 'blend-in':
       return { color: 0.1, formality: 0.2, occasion: 0.35, pattern: 0.15, recency: 0.1, weather: 0.1 };
     case 'push-style':
-      return { color: 0.15, formality: 0.1, occasion: 0.15, pattern: 0.1, recency: 0.1, weather: 0.15 };
+      return { color: 0.15, formality: 0.1, occasion: 0.2, pattern: 0.1, recency: 0.2, weather: 0.25 };
     case 'surprise-me':
-      return { color: 0.15, formality: 0.1, occasion: 0.1, pattern: 0.15, recency: 0.05, weather: 0.15 };
+      return { color: 0.15, formality: 0.15, occasion: 0.15, pattern: 0.15, recency: 0.2, weather: 0.2 };
     case 'default':
     default:
       return DEFAULT_WEIGHTS;

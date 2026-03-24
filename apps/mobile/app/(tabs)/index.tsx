@@ -547,10 +547,14 @@ export default function TodayScreen() {
   useEffect(() => {
     if (suggestionsData?.data) {
       setLocalOutfits(suggestionsData.data);
-      setDismissedIds(new Set());
       setCurrentIndex(0);
     }
   }, [suggestionsData]);
+
+  // Only clear dismissals when intent changes
+  useEffect(() => {
+    setDismissedIds(new Set());
+  }, [activeIntent]);
 
   const visibleOutfits = useMemo(
     () => localOutfits.filter((o) => !dismissedIds.has(o.id)),
@@ -580,6 +584,7 @@ export default function TodayScreen() {
       if (!outfit) return;
 
       const keepIds = outfit.items.filter((i) => i.id !== item.id).map((i) => i.id);
+      swapMutation.reset();
       swapMutation.mutate({
         keepIds,
         replaceSlot: item.category,
@@ -650,8 +655,8 @@ export default function TodayScreen() {
     mutationFn: async (params: { outfitId: string; reason: DismissReason }) => {
       return emitPreferenceSignal({
         signal_type: 'skipped',
-        outfit_id: params.outfitId,
-        value: { reason: params.reason, source: 'today_screen' },
+        outfit_id: null,
+        value: { reason: params.reason, suggested_outfit_id: params.outfitId, source: 'today_dismiss' },
         context: todayContext
           ? { occasion: todayContext.inferred_occasion, is_weekend: todayContext.is_weekend }
           : null,
