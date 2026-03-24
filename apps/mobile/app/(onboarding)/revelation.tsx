@@ -196,6 +196,7 @@ export default function RevelationScreen() {
       formality_distribution: { casual: 0.3, smart_casual: 0.3, business: 0.2, formal: 0.1, black_tie: 0.1 },
       brand_affinities: {},
       price_range: { min: 0, max: 0, sweet_spot: 0 },
+      context_archetypes: {},
       avoided_styles: [],
       body_metrics: null,
       taste_vector: null,

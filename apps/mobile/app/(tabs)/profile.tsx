@@ -1,9 +1,17 @@
+import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import type { MarketplaceListing, PaginatedResponse } from '@adore/shared';
-import { listListings, getUserProfile } from '../../lib/api';
+import {
+  listListings,
+  getUserProfile,
+  getAspirationGap,
+  getStyleModes,
+  type AspirationGapResponse,
+  type StyleModesResponse,
+} from '../../lib/api';
 import { colors, fonts, spacing, radii } from '../../lib/theme';
 import { computeStyleDimensions, DEFAULT_DIMENSIONS } from '../../lib/style-dimensions';
 import StyleRadarCard from '../../components/StyleRadarCard';
@@ -45,6 +53,27 @@ export default function ProfileScreen() {
   const hasStyleProfile = !!styleProfile?.style_archetypes &&
     Object.keys(styleProfile.style_archetypes).length > 0;
 
+  // Aspiration Gap data
+  const { data: aspirationData, isLoading: aspirationLoading } = useQuery({
+    queryKey: ['aspiration-gap'],
+    queryFn: getAspirationGap,
+    enabled: hasStyleProfile,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const aspirationGap = aspirationData?.data ?? null;
+
+  // Style Modes data
+  const [modesExpanded, setModesExpanded] = useState(false);
+  const { data: modesData, isLoading: modesLoading } = useQuery({
+    queryKey: ['style-modes'],
+    queryFn: getStyleModes,
+    enabled: hasStyleProfile,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const styleModes = modesData?.data ?? null;
+
   return (
     <ScrollView
       style={styles.scrollView}
@@ -75,6 +104,110 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
+
+      {/* Aspiration Gap Card */}
+      {hasStyleProfile && (
+        <View style={profileCardStyles.section}>
+          <Text style={profileCardStyles.sectionCaption}>ASPIRATION GAP</Text>
+          {aspirationLoading ? (
+            <View style={profileCardStyles.loadingRow}>
+              <ActivityIndicator size="small" color={colors.accent} />
+            </View>
+          ) : aspirationGap && aspirationGap.gaps.length > 0 ? (
+            <View style={profileCardStyles.card}>
+              <Text style={profileCardStyles.summary}>{aspirationGap.summary}</Text>
+              <View style={profileCardStyles.gapList}>
+                {aspirationGap.gaps.slice(0, 3).map((gap) => {
+                  const absD = Math.abs(gap.delta);
+                  const pct = Math.round(absD * 100);
+                  const isPositive = gap.delta > 0;
+                  return (
+                    <View key={gap.archetype} style={profileCardStyles.gapRow}>
+                      <View style={profileCardStyles.gapLabelRow}>
+                        <Ionicons
+                          name={isPositive ? 'arrow-up' : 'arrow-down'}
+                          size={12}
+                          color={isPositive ? colors.warning : colors.success}
+                        />
+                        <Text style={profileCardStyles.gapArchetype}>
+                          {gap.archetype.charAt(0).toUpperCase() + gap.archetype.slice(1)}
+                        </Text>
+                      </View>
+                      <View style={profileCardStyles.gapBarContainer}>
+                        <View
+                          style={[
+                            profileCardStyles.gapBarFill,
+                            {
+                              width: `${Math.min(100, pct * 3)}%`,
+                              backgroundColor: isPositive ? colors.warning : colors.success,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={profileCardStyles.gapPct}>
+                        {isPositive ? '+' : '-'}{pct}%
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ) : aspirationGap ? (
+            <View style={profileCardStyles.card}>
+              <Text style={profileCardStyles.alignedText}>
+                Your wardrobe reflects your style aspirations well.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+
+      {/* Style Modes Section */}
+      {hasStyleProfile && (
+        <View style={profileCardStyles.section}>
+          <Pressable
+            style={profileCardStyles.sectionHeaderRow}
+            onPress={() => setModesExpanded((prev) => !prev)}
+          >
+            <Text style={profileCardStyles.sectionCaption}>STYLE MODES</Text>
+            <Ionicons
+              name={modesExpanded ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={colors.textSecondary}
+            />
+          </Pressable>
+          {modesLoading && modesExpanded ? (
+            <View style={profileCardStyles.loadingRow}>
+              <ActivityIndicator size="small" color={colors.accent} />
+            </View>
+          ) : modesExpanded && styleModes && Object.keys(styleModes.modes).length > 0 ? (
+            <View style={profileCardStyles.modesGrid}>
+              {Object.entries(styleModes.modes).slice(0, 6).map(([occasion, archetypes]) => {
+                const topEntry = Object.entries(archetypes).sort((a, b) => b[1] - a[1])[0];
+                const topName = topEntry ? topEntry[0] : 'unknown';
+                const topPct = topEntry ? Math.round(topEntry[1] * 100) : 0;
+                return (
+                  <View key={occasion} style={profileCardStyles.modeCard}>
+                    <Text style={profileCardStyles.modeOccasion}>
+                      {occasion.replace(/-/g, ' ')}
+                    </Text>
+                    <Text style={profileCardStyles.modeArchetype}>
+                      {topName.charAt(0).toUpperCase() + topName.slice(1)}
+                    </Text>
+                    <Text style={profileCardStyles.modePct}>{topPct}%</Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : modesExpanded && styleModes?.source === 'empty' ? (
+            <View style={profileCardStyles.card}>
+              <Text style={profileCardStyles.alignedText}>
+                Log outfits with occasions to see how your style shifts per context.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       {/* Menu items */}
       <View style={styles.menuSection}>
@@ -232,5 +365,131 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: colors.error,
+  },
+});
+
+// ── Aspiration Gap & Style Modes Card Styles ────────────────
+
+const profileCardStyles = StyleSheet.create({
+  section: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionCaption: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 1.5,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  loadingRow: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  summary: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  alignedText: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  gapList: {
+    gap: spacing.sm,
+  },
+  gapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  gapLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    width: 100,
+  },
+  gapArchetype: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textPrimary,
+  },
+  gapBarContainer: {
+    flex: 1,
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  gapBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  gapPct: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    width: 36,
+    textAlign: 'right',
+  },
+  modesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  modeCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    width: '47%',
+  },
+  modeOccasion: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    color: colors.textMuted,
+    textTransform: 'capitalize',
+    marginBottom: 4,
+  },
+  modeArchetype: {
+    fontFamily: fonts.inter.semibold,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  modePct: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.accent,
+    marginTop: 2,
   },
 });

@@ -6,6 +6,7 @@ import {
   Pressable,
   Image,
   ScrollView,
+  FlatList,
   TextInput,
   ActivityIndicator,
   Alert,
@@ -22,12 +23,16 @@ import {
   scanWishlistItem,
   createWishlistItem,
   getHappinessScore,
+  searchWishlistProducts,
   type ScannedWishlistItem,
 } from '../../lib/api';
+import type { ProductSearchResult } from '@adore/shared';
+import ProductCard from '../../components/ProductCard';
+import WishlistButton from '../../components/WishlistButton';
 import { colors, fonts, spacing, radii } from '../../lib/theme';
 import type { HappinessScore } from '@adore/shared';
 
-type FlowStep = 'pick' | 'processing' | 'review' | 'happiness-result';
+type FlowStep = 'search' | 'pick' | 'processing' | 'review' | 'happiness-result';
 
 const PRIORITY_CONFIG: Record<
   WishlistPriority,
@@ -44,7 +49,7 @@ export default function AddWishlistItemScreen() {
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState<FlowStep>(
-    params.mode === 'manual' ? 'review' : 'pick'
+    params.mode === 'manual' ? 'review' : 'search'
   );
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
@@ -59,6 +64,55 @@ export default function AddWishlistItemScreen() {
   const [category, setCategory] = useState<ItemCategory | ''>('');
   const [priority, setPriority] = useState<WishlistPriority>('want');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [externalProductId, setExternalProductId] = useState<string | null>(null);
+
+  // ── Product Search ──────────────────────────────────────────
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Debounced search: fires 500ms after user stops typing
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      setHasSearched(false);
+      setIsSearching(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      setHasSearched(true);
+      try {
+        const res = await searchWishlistProducts(searchQuery.trim());
+        if (!cancelled) setSearchResults(res.data?.results ?? []);
+      } catch {
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setIsSearching(false);
+      }
+    }, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [searchQuery]);
+
+  const handleSelectProduct = useCallback((product: ProductSearchResult) => {
+    setName(product.name);
+    setBrand(product.brand ?? '');
+    setPrice(product.price ? String(product.price) : '');
+    setSourceUrl(product.source_url);
+    setUploadedImageUrl(product.image_url || null);
+    setExternalProductId(product.external_product_id ?? null);
+    setStep('review');
+  }, []);
+
+  const handleManualEntry = useCallback(() => {
+    setExternalProductId(null);
+    setSourceUrl('');
+    setUploadedImageUrl(null);
+    setStep('review');
+  }, []);
 
   // ── Image Picking ──────────────────────────────────────────
 
@@ -98,6 +152,8 @@ export default function AddWishlistItemScreen() {
 
   const processScreenshot = useCallback(async (uri: string) => {
     setStep('processing');
+    setExternalProductId(null);
+    setSourceUrl('');
 
     try {
       // Step 1: Upload
@@ -149,6 +205,7 @@ export default function AddWishlistItemScreen() {
         priority,
         image_url: uploadedImageUrl,
         source_url: sourceUrl.trim() || null,
+        external_product_id: externalProductId,
       });
       return result.data;
     },
@@ -171,6 +228,101 @@ export default function AddWishlistItemScreen() {
       Alert.alert('Save failed', err.message);
     },
   });
+
+  // ── Render: Search Step (default) ────────────────────────────
+
+  if (step === 'search') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={searchStyles.wrapper}>
+          <Text style={styles.title}>Add to Wishlist</Text>
+
+          {/* Search bar */}
+          <View style={searchStyles.searchBar}>
+            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <TextInput
+              style={searchStyles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search products, e.g. navy cashmere sweater"
+              placeholderTextColor={colors.textMuted}
+              autoFocus
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </Pressable>
+            )}
+          </View>
+
+          {/* Results */}
+          {isSearching ? (
+            <View style={searchStyles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.accent} />
+              <Text style={searchStyles.loadingText}>Searching...</Text>
+            </View>
+          ) : searchResults.length > 0 ? (
+            <FlatList
+              data={searchResults}
+              keyExtractor={(item, index) => item.external_product_id ?? `${item.source_url}-${index}`}
+              style={searchStyles.resultsList}
+              renderItem={({ item }) => (
+                <ProductCard
+                  product={item}
+                  onPress={() => handleSelectProduct(item)}
+                  rightAction={
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  }
+                />
+              )}
+              ItemSeparatorComponent={() => <View style={searchStyles.separator} />}
+              keyboardShouldPersistTaps="handled"
+            />
+          ) : hasSearched && searchQuery.trim().length >= 2 ? (
+            <View style={searchStyles.emptyContainer}>
+              <Ionicons name="search-outline" size={32} color={colors.textMuted} />
+              <Text style={searchStyles.emptyText}>No results found</Text>
+              <Pressable onPress={handleManualEntry}>
+                <Text style={searchStyles.emptyLink}>Add manually instead</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={searchStyles.hintContainer}>
+              <Text style={searchStyles.hintText}>
+                Search for a product to auto-fill details, or use the options below.
+              </Text>
+            </View>
+          )}
+
+          {/* Secondary actions */}
+          <View style={searchStyles.secondaryActions}>
+            <Pressable style={searchStyles.secondaryChip} onPress={() => pickImage('library')}>
+              <Ionicons name="image-outline" size={16} color={colors.secondary} />
+              <Text style={searchStyles.secondaryChipText}>Screenshot</Text>
+            </Pressable>
+            <Pressable style={searchStyles.secondaryChip} onPress={() => pickImage('camera')}>
+              <Ionicons name="camera-outline" size={16} color={colors.secondary} />
+              <Text style={searchStyles.secondaryChipText}>Camera</Text>
+            </Pressable>
+            <Pressable style={searchStyles.secondaryChip} onPress={handleManualEntry}>
+              <Ionicons name="create-outline" size={16} color={colors.secondary} />
+              <Text style={searchStyles.secondaryChipText}>Manual</Text>
+            </Pressable>
+          </View>
+
+          <Pressable style={styles.cancelLink} onPress={() => router.back()}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
 
   // ── Render: Pick Source ─────────────────────────────────────
 
@@ -202,7 +354,7 @@ export default function AddWishlistItemScreen() {
 
           <Pressable
             style={styles.secondaryButton}
-            onPress={() => setStep('review')}
+            onPress={handleManualEntry}
           >
             <Ionicons name="create-outline" size={22} color={colors.secondary} />
             <Text style={styles.secondaryButtonText}>Add Manually</Text>
@@ -843,5 +995,105 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textPrimary,
     lineHeight: 20,
+  },
+});
+
+// ── Search Step Styles ──────────────────────────────────────
+
+const searchStyles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    paddingTop: spacing['3xl'],
+    paddingHorizontal: spacing.xl,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    paddingHorizontal: 14,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: fonts.inter.regular,
+    fontSize: 15,
+    color: colors.textPrimary,
+    paddingVertical: 14,
+  },
+  resultsList: {
+    flex: 1,
+    marginHorizontal: -spacing.xl,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.lg,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing['3xl'],
+    gap: spacing.sm,
+  },
+  loadingText: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing['3xl'],
+    gap: spacing.sm,
+  },
+  emptyText: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 15,
+    color: colors.textSecondary,
+  },
+  emptyLink: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.accent,
+    marginTop: spacing.xs,
+  },
+  hintContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  hintText: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  secondaryActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+  },
+  secondaryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  secondaryChipText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.secondary,
   },
 });

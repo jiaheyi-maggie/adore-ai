@@ -7,12 +7,14 @@ import {
   SEASONS,
   ITEM_CATEGORIES,
   SIGNAL_TYPES,
+  MOOD_TAGS,
   type OccasionType,
   type WeatherContext,
   type WardrobeItem,
   type Season,
   type ItemCategory,
   type SignalType,
+  type MoodTag,
 } from '@adore/shared';
 import type { AppVariables } from '../lib/types';
 import { authMiddleware } from '../middleware/auth';
@@ -51,7 +53,8 @@ const suggestSchema = z.object({
     .optional(),
   lat: z.number().min(-90).max(90).optional(),
   lon: z.number().min(-180).max(180).optional(),
-  mood: z.string().max(100).nullable().optional(),
+  mood: z.enum(MOOD_TAGS).nullable().optional(),
+  context_mode: z.enum(OCCASION_TYPES).nullable().optional(),
   style_shift_goal_id: z.string().uuid().nullable().optional(),
   count: z.number().int().min(1).max(10).default(3),
   intent: z.enum(STYLING_INTENTS).default('default'),
@@ -319,6 +322,121 @@ function intentItemBonus(item: WardrobeItem, intent: StylingIntent, recentWornId
   return bonus;
 }
 
+// ── Mood-Based Item Scoring ──────────────────────────────────
+
+/** Mood-to-attribute correlations: which item attributes map to each mood */
+const MOOD_CORRELATIONS: Record<string, {
+  formality_bias: number; // positive = higher formality, negative = lower
+  preferred_materials: Set<string>;
+  preferred_colors: Set<string>;
+  pattern_bias: 'solid' | 'patterned' | 'any';
+}> = {
+  confident: {
+    formality_bias: 0.5,
+    preferred_materials: new Set(['leather', 'wool', 'silk', 'denim']),
+    preferred_colors: new Set(['black', 'navy', 'red', 'burgundy', 'charcoal']),
+    pattern_bias: 'solid',
+  },
+  comfortable: {
+    formality_bias: -0.5,
+    preferred_materials: new Set(['cotton', 'knit', 'cashmere', 'linen']),
+    preferred_colors: new Set(['cream', 'oatmeal', 'grey', 'beige', 'white', 'sage']),
+    pattern_bias: 'any',
+  },
+  creative: {
+    formality_bias: 0,
+    preferred_materials: new Set(['velvet', 'silk', 'denim', 'suede', 'linen']),
+    preferred_colors: new Set(['mustard', 'teal', 'coral', 'burgundy', 'olive', 'rust']),
+    pattern_bias: 'patterned',
+  },
+  powerful: {
+    formality_bias: 1.0,
+    preferred_materials: new Set(['wool', 'leather', 'silk', 'cashmere']),
+    preferred_colors: new Set(['black', 'navy', 'charcoal', 'burgundy', 'red']),
+    pattern_bias: 'solid',
+  },
+  relaxed: {
+    formality_bias: -1.0,
+    preferred_materials: new Set(['linen', 'cotton', 'knit']),
+    preferred_colors: new Set(['beige', 'cream', 'sage', 'oatmeal', 'light blue', 'white']),
+    pattern_bias: 'any',
+  },
+  overdressed: {
+    formality_bias: 0,
+    preferred_materials: new Set(),
+    preferred_colors: new Set(),
+    pattern_bias: 'any',
+  },
+  underdressed: {
+    formality_bias: 0,
+    preferred_materials: new Set(),
+    preferred_colors: new Set(),
+    pattern_bias: 'any',
+  },
+  meh: {
+    formality_bias: 0,
+    preferred_materials: new Set(),
+    preferred_colors: new Set(),
+    pattern_bias: 'any',
+  },
+};
+
+/**
+ * Computes a mood-based scoring bonus for a wardrobe item.
+ * Returns 0-0.3 bonus based on how well the item matches the mood.
+ */
+function moodItemBonus(item: WardrobeItem, mood: MoodTag): number {
+  const correlation = MOOD_CORRELATIONS[mood];
+  if (!correlation) return 0;
+
+  let bonus = 0;
+
+  // Material match
+  if (item.material && correlation.preferred_materials.size > 0) {
+    if (correlation.preferred_materials.has(item.material)) {
+      bonus += 0.1;
+    }
+  }
+
+  // Color match
+  if (correlation.preferred_colors.size > 0) {
+    const colorMatch = item.colors.some((c) =>
+      correlation.preferred_colors.has(c.toLowerCase())
+    );
+    if (colorMatch) bonus += 0.1;
+  }
+
+  // Formality bias
+  if (correlation.formality_bias !== 0) {
+    const target = 3 + correlation.formality_bias; // center is 3
+    const distance = Math.abs(item.formality_level - target);
+    if (distance <= 1) bonus += 0.05;
+  }
+
+  // Pattern preference
+  if (correlation.pattern_bias === 'patterned' && item.pattern !== 'solid') {
+    bonus += 0.05;
+  } else if (correlation.pattern_bias === 'solid' && item.pattern === 'solid') {
+    bonus += 0.03;
+  }
+
+  return bonus;
+}
+
+/**
+ * Computes bonus from past outfits tagged with the same mood.
+ * Items that appeared in highly-rated mood-matching outfits get boosted.
+ */
+function moodHistoryBonus(
+  itemId: string,
+  moodItemFrequency: Map<string, number>,
+): number {
+  const frequency = moodItemFrequency.get(itemId) ?? 0;
+  if (frequency === 0) return 0;
+  // Diminishing returns: first occurrence = 0.1, each additional = +0.03
+  return Math.min(0.2, 0.1 + (frequency - 1) * 0.03);
+}
+
 // ── Outfit Generation (Hero Piece Heuristic) ──────────────────
 
 interface ScoredOutfit {
@@ -333,7 +451,9 @@ function scoreOutfitCombination(
   weather: WeatherContext | null,
   recentWornIds: Set<string>,
   intent: StylingIntent = 'default',
-  rng: () => number = Math.random
+  rng: () => number = Math.random,
+  mood: MoodTag | null = null,
+  moodItemFrequency: Map<string, number> = new Map(),
 ): number {
   if (items.length < 2) return 0;
 
@@ -402,6 +522,14 @@ function scoreOutfitCombination(
   // 7. Intent item bonuses
   const intentBonus = items.reduce((sum, item) => sum + intentItemBonus(item, intent, recentWornIds, rng), 0) / items.length;
 
+  // 8. Mood bonuses (heuristic + history)
+  let moodBonus = 0;
+  if (mood) {
+    const heuristicBonus = items.reduce((sum, item) => sum + moodItemBonus(item, mood), 0) / items.length;
+    const historyBonus = items.reduce((sum, item) => sum + moodHistoryBonus(item.id, moodItemFrequency), 0) / items.length;
+    moodBonus = heuristicBonus + historyBonus;
+  }
+
   // Composite score (weighted by intent)
   const composite =
     colorScore * weights.color +
@@ -410,7 +538,8 @@ function scoreOutfitCombination(
     patternCohesion * weights.pattern +
     recencyPenalty * weights.recency +
     weatherAvg * weights.weather +
-    intentBonus * 0.15; // intent bonus is additive, capped at ~0.15
+    intentBonus * 0.15 + // intent bonus is additive, capped at ~0.15
+    moodBonus * 0.15; // mood bonus is additive
 
   return Math.round(Math.min(1, composite) * 100) / 100;
 }
@@ -422,7 +551,9 @@ function generateOutfits(
   recentWornIds: Set<string>,
   count: number,
   intent: StylingIntent = 'default',
-  userId: string = ''
+  userId: string = '',
+  mood: MoodTag | null = null,
+  moodItemFrequency: Map<string, number> = new Map(),
 ): ScoredOutfit[] {
   const rng = dailySeededRandom(userId);
   const season = getCurrentSeason();
@@ -491,6 +622,12 @@ function generateOutfits(
       if (item.material && COMFORT_MATERIALS.has(item.material)) s += 0.8;
     }
 
+    // Mood boost for hero selection
+    if (mood) {
+      s += moodItemBonus(item, mood) * 2; // 2x weight for hero selection
+      s += moodHistoryBonus(item.id, moodItemFrequency);
+    }
+
     return s;
   }
 
@@ -508,7 +645,9 @@ function generateOutfits(
           colorHarmonyScore(heroItem.colors, c.colors) * 0.5 +
           (Math.abs(c.formality_level - heroItem.formality_level) <= 1 ? 0.3 : 0) +
           (!recentWornIds.has(c.id) ? 0.2 : 0) +
-          intentItemBonus(c, intent, recentWornIds, rng),
+          intentItemBonus(c, intent, recentWornIds, rng) +
+          (mood ? moodItemBonus(c, mood) : 0) +
+          moodHistoryBonus(c.id, moodItemFrequency),
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -580,7 +719,7 @@ function generateOutfits(
     }
 
     // Score the full combination
-    const score = scoreOutfitCombination(outfitItems, occasion, weather, recentWornIds, intent, rng);
+    const score = scoreOutfitCombination(outfitItems, occasion, weather, recentWornIds, intent, rng, mood, moodItemFrequency);
 
     results.push({ items: outfitItems, score, hero_item_id: hero.id });
     usedHeroIds.add(hero.id);
@@ -662,6 +801,7 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
   const { data: wardrobeItems, error: wardrobeError } = await supabase
     .from('wardrobe_items')
     .select('*')
+    .eq('user_id', userId)
     .eq('status', 'active')
     .limit(500);
 
@@ -703,6 +843,7 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
   const { data: recentOutfits } = await supabase
     .from('outfits')
     .select('outfit_items(wardrobe_item_id)')
+    .eq('user_id', userId)
     .gte('worn_date', threeDaysAgoStr);
 
   const recentWornIds = new Set<string>();
@@ -719,15 +860,55 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
     }
   }
 
-  // 5. Generate outfits using hero-piece heuristic
+  // 5. Mood history: items from past outfits tagged with this mood
+  const moodItemFrequency = new Map<string, number>();
+  const mood = body.mood ?? null;
+
+  if (mood) {
+    const { data: moodOutfits } = await supabase
+      .from('outfits')
+      .select(`
+        happiness_score,
+        outfit_items(wardrobe_item_id)
+      `)
+      .eq('user_id', userId)
+      .eq('mood_tag', mood)
+      .gte('happiness_score', 6) // only learn from outfits rated 6+
+      .limit(50);
+
+    if (moodOutfits) {
+      for (const outfit of moodOutfits) {
+        const outfitItems = (outfit as Record<string, unknown>).outfit_items as Array<{
+          wardrobe_item_id: string | null;
+        }> | null;
+        if (outfitItems) {
+          for (const oi of outfitItems) {
+            if (oi.wardrobe_item_id) {
+              moodItemFrequency.set(
+                oi.wardrobe_item_id,
+                (moodItemFrequency.get(oi.wardrobe_item_id) ?? 0) + 1
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 6. Resolve context_mode: if provided, override occasion for archetype-aware selection
+  const effectiveOccasion = body.context_mode ?? body.occasion ?? null;
+
+  // 7. Generate outfits using hero-piece heuristic
   const outfits = generateOutfits(
     items,
-    body.occasion ?? null,
+    effectiveOccasion,
     weather,
     recentWornIds,
     body.count,
     body.intent,
-    userId
+    userId,
+    mood,
+    moodItemFrequency,
   );
 
   if (outfits.length === 0) {
@@ -738,13 +919,13 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
     });
   }
 
-  // 6. Generate styling notes in parallel (with timeout)
+  // 8. Generate styling notes in parallel (with timeout)
   const suggestions = await Promise.all(
     outfits.map(async (outfit) => {
       const stylingNote = await Promise.race([
-        generateStylingNote(outfit.items, body.occasion ?? null, weather),
+        generateStylingNote(outfit.items, effectiveOccasion, weather),
         new Promise<string>((resolve) =>
-          setTimeout(() => resolve(generateTemplateStylingNote(outfit.items, body.occasion ?? null)), 5000)
+          setTimeout(() => resolve(generateTemplateStylingNote(outfit.items, effectiveOccasion)), 5000)
         ),
       ]);
 
@@ -754,7 +935,7 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
 
       return {
         id: crypto.randomUUID(),
-        name: generateOutfitName(outfit.items, body.occasion ?? null),
+        name: generateOutfitName(outfit.items, effectiveOccasion),
         items: outfit.items.map((item) => ({
           id: item.id,
           name: item.name,
@@ -839,6 +1020,7 @@ outfitSuggest.get('/today-context', zValidator('query', todayContextSchema), asy
   const { count: wardrobeCount } = await supabase
     .from('wardrobe_items')
     .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
     .eq('status', 'active');
 
   return c.json({

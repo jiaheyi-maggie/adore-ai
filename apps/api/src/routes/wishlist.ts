@@ -10,6 +10,7 @@ import {
 import type { AppVariables } from '../lib/types';
 import { authMiddleware } from '../middleware/auth';
 import { calculateHappinessScore, countSimilarOwned } from '../lib/happiness';
+import { searchProduct, storeProductMatches } from '../lib/product-search';
 
 const wishlist = new Hono<{ Variables: AppVariables }>();
 wishlist.use('*', authMiddleware);
@@ -42,6 +43,7 @@ const createItemSchema = z.object({
   priority: z.enum(WISHLIST_PRIORITIES).default('want'),
   status: z.literal('active').default('active'),
   price_alert_threshold: z.number().min(0).nullable().optional(),
+  external_product_id: z.string().uuid().nullable().optional(),
 });
 
 const updateItemSchema = z.object({
@@ -72,6 +74,11 @@ const listQuerySchema = z.object({
 
 const scanSchema = z.object({
   image_url: z.string().url(),
+});
+
+const searchSchema = z.object({
+  query: z.string().min(2).max(200),
+  limit: z.coerce.number().int().min(1).max(10).default(5),
 });
 
 const createBudgetSchema = z.object({
@@ -112,6 +119,7 @@ wishlist.post('/items', zValidator('json', createItemSchema), async (c) => {
       priority: body.priority,
       status: body.status,
       price_alert_threshold: body.price_alert_threshold ?? null,
+      external_product_id: body.external_product_id ?? null,
       similar_owned_count: similarCount,
     })
     .select()
@@ -430,6 +438,46 @@ wishlist.post('/items/scan', zValidator('json', scanSchema), async (c) => {
       502
     );
   }
+});
+
+// ── POST /wishlist/search — Search Google Shopping for products ──
+
+wishlist.post('/search', zValidator('json', searchSchema), async (c) => {
+  if (!process.env.SERPER_API_KEY) {
+    return c.json(
+      { data: null, error: { code: 'CONFIG_ERROR', message: 'Product search is not configured' } },
+      500,
+    );
+  }
+
+  const body = c.req.valid('json');
+  const query = body.query.trim();
+  const start = Date.now();
+
+  // Search via Serper Google Shopping API (gracefully returns [] on failure)
+  const results = await searchProduct(query);
+  const trimmed = results.slice(0, body.limit);
+
+  // Store results in external_products for stable IDs (best-effort)
+  let ids: (string | null)[] = trimmed.map(() => null);
+  try {
+    ids = await storeProductMatches(trimmed, null);
+  } catch (err) {
+    console.error('[wishlist-search] Failed to store products:', err instanceof Error ? err.message : err);
+  }
+
+  console.log(`[wishlist-search] query="${query}" results=${results.length} stored=${ids.filter(Boolean).length} duration=${Date.now() - start}ms`);
+
+  // Zip IDs onto results
+  const enriched = trimmed.map((r, i) => ({
+    ...r,
+    external_product_id: ids[i] ?? null,
+  }));
+
+  return c.json({
+    data: { query, results: enriched },
+    error: null,
+  });
 });
 
 // ── POST /wishlist/items/:id/happiness — Calculate score ─────

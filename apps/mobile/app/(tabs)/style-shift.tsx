@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, fonts, spacing, radii } from '../../lib/theme';
+import WishlistButton from '../../components/WishlistButton';
 import {
   getStylePresets,
   createStyleShift,
@@ -815,43 +816,60 @@ function ShoppingListStep({
       </Text>
 
       {items.map((product, index) => (
-        <Pressable
+        <View
           key={`${product.source_url}-${index}`}
           style={styles.shoppingItem}
-          onPress={() => {
-            if (product.source_url) {
-              Linking.openURL(product.source_url);
-            }
-          }}
         >
-          {product.image_url ? (
-            <Image
-              source={{ uri: product.image_url }}
-              style={styles.shoppingImage}
-            />
-          ) : (
-            <View style={[styles.shoppingImage, styles.shoppingImagePlaceholder]}>
-              <Ionicons name="bag-outline" size={20} color={colors.textMuted} />
+          <Pressable
+            style={styles.shoppingTappable}
+            onPress={() => {
+              if (product.source_url) {
+                Linking.openURL(product.source_url);
+              }
+            }}
+          >
+            {product.image_url ? (
+              <Image
+                source={{ uri: product.image_url }}
+                style={styles.shoppingImage}
+              />
+            ) : (
+              <View style={[styles.shoppingImage, styles.shoppingImagePlaceholder]}>
+                <Ionicons name="bag-outline" size={20} color={colors.textMuted} />
+              </View>
+            )}
+            <View style={styles.shoppingInfo}>
+              <Text style={styles.shoppingName} numberOfLines={2}>
+                {product.name}
+              </Text>
+              <Text style={styles.shoppingRetailer}>{product.retailer}</Text>
+              <View style={styles.shoppingMeta}>
+                <Text style={styles.shoppingUnlocks}>
+                  Unlocks ~{product.outfit_unlock_estimate} outfits
+                </Text>
+                <Text style={styles.shoppingHappiness}>
+                  Happiness: {product.happiness_prediction.toFixed(1)}/10
+                </Text>
+              </View>
             </View>
-          )}
-          <View style={styles.shoppingInfo}>
-            <Text style={styles.shoppingName} numberOfLines={2}>
-              {product.name}
+            <Text style={styles.shoppingPrice}>
+              ${product.price.toFixed(0)}
             </Text>
-            <Text style={styles.shoppingRetailer}>{product.retailer}</Text>
-            <View style={styles.shoppingMeta}>
-              <Text style={styles.shoppingUnlocks}>
-                Unlocks ~{product.outfit_unlock_estimate} outfits
-              </Text>
-              <Text style={styles.shoppingHappiness}>
-                Happiness: {product.happiness_prediction.toFixed(1)}/10
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.shoppingPrice}>
-            ${product.price.toFixed(0)}
-          </Text>
-        </Pressable>
+          </Pressable>
+          <WishlistButton
+            product={{
+              name: product.name,
+              price: product.price,
+              currency: product.currency ?? 'USD',
+              source_url: product.source_url,
+              image_url: product.image_url,
+              retailer: product.retailer,
+              brand: null,
+            }}
+            defaults={{ category: product.category as any }}
+            size="sm"
+          />
+        </View>
       ))}
 
       <View style={styles.totalRow}>
@@ -1293,6 +1311,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     gap: spacing.md,
     alignItems: 'center',
+  },
+  shoppingTappable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   shoppingImage: {
     width: 56,

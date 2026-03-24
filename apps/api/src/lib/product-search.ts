@@ -141,7 +141,7 @@ export async function searchProduct(
 export async function storeProductMatches(
   results: ProductSearchResult[],
   category: string | null
-): Promise<string[]> {
+): Promise<(string | null)[]> {
   if (results.length === 0) return [];
 
   const adminClient = getAdminClient();
@@ -160,7 +160,7 @@ export async function storeProductMatches(
     },
   }));
 
-  const ids: string[] = [];
+  const ids: (string | null)[] = [];
 
   // Insert one by one to handle source_url uniqueness gracefully.
   // external_products doesn't have a unique constraint on source_url in the schema,
@@ -187,12 +187,11 @@ export async function storeProductMatches(
 
     if (error) {
       console.error('[product-search] Failed to store product:', error.message);
+      ids.push(null);
       continue;
     }
 
-    if (inserted) {
-      ids.push(inserted.id);
-    }
+    ids.push(inserted?.id ?? null);
   }
 
   return ids;

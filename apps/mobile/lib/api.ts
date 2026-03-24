@@ -475,7 +475,7 @@ export interface SuggestOutfitsParams {
   weather?: WeatherContext | null;
   lat?: number;
   lon?: number;
-  mood?: string | null;
+  mood?: MoodTag | null;
   style_shift_goal_id?: string | null;
   count?: number;
   intent?: StylingIntent;
@@ -801,6 +801,7 @@ export interface CreateWishlistItemPayload {
   name: string;
   image_url?: string | null;
   source_url?: string | null;
+  external_product_id?: string | null;
   price?: number | null;
   brand?: string | null;
   category?: ItemCategory | null;
@@ -869,6 +870,23 @@ export async function dismissWishlistItem(
     `/wishlist/items/${id}/dismiss`,
     { method: 'POST' }
   );
+}
+
+// ── Wishlist Product Search ────────────────────────────────────
+
+export interface WishlistSearchResponse {
+  query: string;
+  results: ProductSearchResult[];
+}
+
+export async function searchWishlistProducts(
+  query: string,
+  limit?: number
+): Promise<ApiResponse<WishlistSearchResponse>> {
+  return apiFetch<ApiResponse<WishlistSearchResponse>>('/wishlist/search', {
+    method: 'POST',
+    body: JSON.stringify({ query, limit }),
+  });
 }
 
 // ── Budget API ────────────────────────────────────────────────
@@ -1159,3 +1177,64 @@ export async function getShiftShoppingList(
     }
   );
 }
+
+// ── Aspiration Gap API ────────────────────────────────────────
+
+export interface AspirationGapItem {
+  archetype: string;
+  actual: number;
+  aspirational: number;
+  delta: number;
+  insight: string;
+}
+
+export interface AspirationGapResponse {
+  actual_archetypes: Record<string, number>;
+  aspirational_archetypes: Record<string, number>;
+  gaps: AspirationGapItem[];
+  summary: string;
+  wardrobe_item_count: number;
+}
+
+export async function getAspirationGap(): Promise<ApiResponse<AspirationGapResponse>> {
+  return apiFetch<ApiResponse<AspirationGapResponse>>('/auth/profile/aspiration-gap');
+}
+
+// ── Style Modes API ──────────────────────────────────────────
+
+export interface StyleModesResponse {
+  modes: Record<string, Record<string, number>>;
+  source: 'stored' | 'computed' | 'empty';
+}
+
+export async function getStyleModes(): Promise<ApiResponse<StyleModesResponse>> {
+  return apiFetch<ApiResponse<StyleModesResponse>>('/auth/profile/style-modes');
+}
+
+export async function updateStyleModes(
+  modes: Record<string, Record<string, number>>
+): Promise<ApiResponse<{ updated: boolean }>> {
+  return apiFetch<ApiResponse<{ updated: boolean }>>('/auth/profile/style-modes', {
+    method: 'PUT',
+    body: JSON.stringify({ modes }),
+  });
+}
+
+// ── Selectable Moods (subset of MoodTag for proactive selection UI) ──
+
+export const SELECTABLE_MOODS = [
+  'confident',
+  'comfortable',
+  'creative',
+  'powerful',
+  'relaxed',
+] as const satisfies readonly MoodTag[];
+export type MoodTagOption = (typeof SELECTABLE_MOODS)[number];
+
+export const MOOD_DISPLAY: Record<MoodTagOption, { label: string; icon: string; color: string }> = {
+  confident: { label: 'Confident', icon: 'shield-checkmark-outline', color: '#8B3A3A' },
+  comfortable: { label: 'Comfy', icon: 'leaf-outline', color: '#6B8F71' },
+  creative: { label: 'Creative', icon: 'color-palette-outline', color: '#B5783B' },
+  powerful: { label: 'Powerful', icon: 'flash-outline', color: '#4A6FA5' },
+  relaxed: { label: 'Relaxed', icon: 'water-outline', color: '#7B9EC4' },
+};

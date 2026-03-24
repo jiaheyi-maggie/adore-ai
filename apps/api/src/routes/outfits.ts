@@ -271,6 +271,14 @@ outfits.post('/', zValidator('json', createOutfitSchema), async (c) => {
     }
   }
 
+  // 5b. Invalidate cached style modes when outfit has an occasion
+  if (outfitData.occasion) {
+    await supabase
+      .from('style_profiles')
+      .update({ context_archetypes: {} })
+      .eq('user_id', userId);
+  }
+
   // 6. Return the full outfit with items + any warnings
   const { data: fullOutfit } = await supabase
     .from('outfits')

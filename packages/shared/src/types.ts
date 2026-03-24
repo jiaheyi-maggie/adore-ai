@@ -237,6 +237,7 @@ export interface StyleProfile {
   style_archetypes: Record<string, number>; // e.g. { minimalist: 0.4, classic: 0.3 }
   color_preferences: Record<string, number>; // e.g. { navy: 0.9, black: 0.8 }
   formality_distribution: Record<FormalityLevel, number>; // named keys, not array
+  context_archetypes: Record<string, Record<string, number>>; // occasion → archetype weights
   brand_affinities: Record<string, number>;
   price_range: { min: number; max: number; sweet_spot: number };
   avoided_styles: string[];
@@ -326,6 +327,7 @@ export interface WishlistItem {
   name: string;
   image_url: string | null;
   source_url: string | null;
+  external_product_id: string | null;
   price: number | null;
   brand: string | null;
   category: ItemCategory | null;

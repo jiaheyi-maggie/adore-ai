@@ -27,12 +27,15 @@ import {
   DISMISS_REASONS,
   STYLING_INTENTS,
   INTENT_DISPLAY,
+  SELECTABLE_MOODS,
+  MOOD_DISPLAY,
   type SuggestedOutfit,
   type SuggestedOutfitItem,
   type SwapAlternative,
   type TodayContext,
   type StylingIntent,
   type DismissReason,
+  type MoodTagOption,
 } from '../../lib/api';
 import { colors, fonts, spacing, radii, typography } from '../../lib/theme';
 
@@ -41,6 +44,13 @@ const CARD_WIDTH = SCREEN_WIDTH - 48;
 const CARD_MARGIN = 8;
 
 // ── Helpers ─────────────────────────────────────────────────────
+
+function getTimeOfDay(): 'morning' | 'afternoon' | 'evening' {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
 
 function getGreeting(timeOfDay: 'morning' | 'afternoon' | 'evening'): string {
   switch (timeOfDay) {
@@ -477,6 +487,10 @@ export default function TodayScreen() {
   const [intentPickerVisible, setIntentPickerVisible] = useState(false);
   const [intentInitialized, setIntentInitialized] = useState(false);
 
+  // Feature 4: Mood state
+  const [selectedMood, setSelectedMood] = useState<MoodTagOption | null>(null);
+  const [moodExpanded, setMoodExpanded] = useState(false);
+
   // Local outfit state for swaps (copy of suggestions that we can mutate)
   const [localOutfits, setLocalOutfits] = useState<SuggestedOutfit[]>([]);
 
@@ -522,7 +536,7 @@ export default function TodayScreen() {
     }
   }, [todayContext, intentInitialized]);
 
-  // Fetch outfit suggestions (includes intent)
+  // Fetch outfit suggestions (includes intent + mood)
   const {
     data: suggestionsData,
     isLoading: suggestionsLoading,
@@ -530,7 +544,7 @@ export default function TodayScreen() {
     error: suggestionsErrorObj,
     refetch: refetchSuggestions,
   } = useQuery({
-    queryKey: ['outfit-suggestions', location?.lat, location?.lon, todayContext?.inferred_occasion, activeIntent],
+    queryKey: ['outfit-suggestions', location?.lat, location?.lon, todayContext?.inferred_occasion, activeIntent, selectedMood],
     queryFn: () =>
       suggestOutfits({
         occasion: todayContext?.inferred_occasion ?? null,
@@ -538,6 +552,7 @@ export default function TodayScreen() {
         lon: location?.lon,
         count: 5,
         intent: activeIntent,
+        mood: selectedMood,
       }),
     enabled: todayContext != null || !contextLoading,
     staleTime: 10 * 60 * 1000,
@@ -551,10 +566,10 @@ export default function TodayScreen() {
     }
   }, [suggestionsData]);
 
-  // Only clear dismissals when intent changes
+  // Clear dismissals when intent or mood changes (context switch)
   useEffect(() => {
     setDismissedIds(new Set());
-  }, [activeIntent]);
+  }, [activeIntent, selectedMood]);
 
   const visibleOutfits = useMemo(
     () => localOutfits.filter((o) => !dismissedIds.has(o.id)),
@@ -697,9 +712,10 @@ export default function TodayScreen() {
       return createOutfit({
         occasion: outfit.occasion,
         weather_context: outfit.weather,
+        mood_tag: selectedMood ?? undefined,
         worn_date: new Date().toISOString().split('T')[0],
         item_ids: outfit.items.map((i) => i.id),
-        notes: `Suggested outfit: ${outfit.name}`,
+        notes: `Suggested outfit: ${outfit.name}${selectedMood ? ` (mood: ${selectedMood})` : ''}`,
       });
     },
     onSuccess: (_data, outfit) => {
@@ -784,9 +800,7 @@ export default function TodayScreen() {
             {/* ── Context Bar ──────────────────────────── */}
             <View style={styles.contextBar}>
               <Text style={styles.greeting}>
-                {todayContext
-                  ? `${getGreeting(todayContext.time_of_day)}${todayContext.user_name ? `, ${todayContext.user_name}` : ''}`
-                  : 'Good day'}
+                {`${getGreeting(todayContext?.time_of_day ?? getTimeOfDay())}${todayContext?.user_name ? `, ${todayContext.user_name}` : ''}`}
               </Text>
 
               {todayContext?.weather && (
@@ -828,6 +842,65 @@ export default function TodayScreen() {
                 >
                   <Text style={styles.intentChangeText}>change</Text>
                 </Pressable>
+              </View>
+            )}
+
+            {/* ── Mood Selector (Feature J) ───────────── */}
+            {!isLoading && (todayContext?.wardrobe_item_count ?? 0) > 0 && (
+              <View style={moodStyles.container}>
+                <Pressable
+                  style={moodStyles.header}
+                  onPress={() => setMoodExpanded((prev) => !prev)}
+                >
+                  <View style={moodStyles.headerLeft}>
+                    <Ionicons name="happy-outline" size={16} color={colors.textSecondary} />
+                    <Text style={moodStyles.headerLabel}>
+                      {selectedMood
+                        ? `Mood: ${MOOD_DISPLAY[selectedMood].label}`
+                        : 'How are you feeling?'}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={moodExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+
+                {moodExpanded && (
+                  <View style={moodStyles.chipRow}>
+                    {SELECTABLE_MOODS.map((mood) => {
+                      const info = MOOD_DISPLAY[mood];
+                      const isActive = selectedMood === mood;
+                      return (
+                        <Pressable
+                          key={mood}
+                          style={[
+                            moodStyles.chip,
+                            isActive && { backgroundColor: info.color, borderColor: info.color },
+                          ]}
+                          onPress={() => {
+                            setSelectedMood(isActive ? null : mood);
+                          }}
+                        >
+                          <Ionicons
+                            name={info.icon as any}
+                            size={14}
+                            color={isActive ? '#fff' : info.color}
+                          />
+                          <Text
+                            style={[
+                              moodStyles.chipLabel,
+                              isActive && { color: '#fff' },
+                            ]}
+                          >
+                            {info.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             )}
 
@@ -1301,6 +1374,56 @@ const intentStyles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+});
+
+// ── Mood Selector Styles ──────────────────────────────────────
+
+const moodStyles = StyleSheet.create({
+  container: {
+    marginHorizontal: 24,
+    marginBottom: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerLabel: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipLabel: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textPrimary,
   },
 });
 

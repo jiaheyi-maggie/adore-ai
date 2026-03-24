@@ -252,7 +252,12 @@ export function classifyWardrobe(
 // to their attribute signatures. These are distinct from the compound
 // preset IDs (e.g. "clean-minimalist") in archetype-presets.ts.
 
-const BASE_ARCHETYPE_SIGNATURES: Record<string, { colors: string[]; materials: string[]; patterns: string[]; formality_range: [number, number]; categories: string[]; style_tags: string[] }> = {
+export const BASE_ARCHETYPES = [
+  'minimalist', 'classic', 'bohemian', 'edgy', 'romantic',
+  'maximalist', 'glamorous', 'vintage', 'cozy', 'athletic',
+] as const;
+
+export const BASE_ARCHETYPE_SIGNATURES: Record<string, { colors: string[]; materials: string[]; patterns: string[]; formality_range: [number, number]; categories: string[]; style_tags: string[] }> = {
   minimalist: { colors: ['black', 'white', 'grey', 'beige'], materials: ['cotton', 'linen', 'wool'], patterns: ['solid'], formality_range: [2, 4], categories: ['tops', 'bottoms'], style_tags: ['clean', 'simple', 'understated'] },
   classic: { colors: ['navy', 'white', 'cream', 'camel'], materials: ['cotton', 'wool', 'cashmere'], patterns: ['solid', 'striped'], formality_range: [3, 5], categories: ['outerwear', 'tops', 'bottoms'], style_tags: ['timeless', 'polished', 'refined'] },
   bohemian: { colors: ['brown', 'rust', 'cream', 'turquoise'], materials: ['linen', 'cotton', 'suede', 'leather'], patterns: ['floral', 'abstract', 'geometric'], formality_range: [1, 3], categories: ['dresses', 'accessories', 'jewelry'], style_tags: ['free-spirited', 'earthy', 'layered'] },
@@ -264,6 +269,29 @@ const BASE_ARCHETYPE_SIGNATURES: Record<string, { colors: string[]; materials: s
   cozy: { colors: ['cream', 'oatmeal', 'camel', 'grey'], materials: ['wool', 'cashmere', 'knit', 'cotton'], patterns: ['solid', 'striped'], formality_range: [1, 2], categories: ['tops', 'outerwear'], style_tags: ['comfortable', 'warm', 'relaxed'] },
   athletic: { colors: ['black', 'grey', 'white', 'neon'], materials: ['synthetic', 'cotton', 'nylon'], patterns: ['solid', 'graphic'], formality_range: [1, 2], categories: ['activewear', 'shoes'], style_tags: ['sporty', 'functional', 'dynamic'] },
 };
+
+/**
+ * Builds a synthetic ArchetypePreset from a base archetype name.
+ * Used by aspiration-gap and style-modes to score items against individual archetypes.
+ */
+export function buildSyntheticPresetFromBase(archetypeName: string): ArchetypePreset | null {
+  const sig = BASE_ARCHETYPE_SIGNATURES[archetypeName];
+  if (!sig) return null;
+  return {
+    id: `__base_${archetypeName}__`,
+    name: archetypeName.charAt(0).toUpperCase() + archetypeName.slice(1),
+    description: `Base ${archetypeName} archetype`,
+    archetypes: { [archetypeName]: 1.0 },
+    signature: {
+      colors: sig.colors,
+      materials: sig.materials,
+      patterns: sig.patterns,
+      formality_range: sig.formality_range,
+      style_tags: sig.style_tags,
+      favored_categories: sig.categories as ItemCategory[],
+    },
+  };
+}
 
 // ── Current-Style Synthetic Preset ──────────────────────────
 
