@@ -5,11 +5,14 @@ import { GoogleGenAI } from '@google/genai';
 import {
   OCCASION_TYPES,
   SEASONS,
+  ITEM_CATEGORIES,
+  SIGNAL_TYPES,
   type OccasionType,
   type WeatherContext,
   type WardrobeItem,
   type Season,
   type ItemCategory,
+  type SignalType,
 } from '@adore/shared';
 import type { AppVariables } from '../lib/types';
 import { authMiddleware } from '../middleware/auth';
@@ -17,6 +20,18 @@ import { getWeather } from '../lib/weather';
 
 const outfitSuggest = new Hono<{ Variables: AppVariables }>();
 outfitSuggest.use('*', authMiddleware);
+
+// ── Styling Intents ──────────────────────────────────────────
+
+const STYLING_INTENTS = [
+  'default',
+  'comfort-first',
+  'make-statement',
+  'blend-in',
+  'push-style',
+  'surprise-me',
+] as const;
+type StylingIntent = (typeof STYLING_INTENTS)[number];
 
 // ── Validation ────────────────────────────────────────────────
 
@@ -39,6 +54,33 @@ const suggestSchema = z.object({
   mood: z.string().max(100).nullable().optional(),
   style_shift_goal_id: z.string().uuid().nullable().optional(),
   count: z.number().int().min(1).max(10).default(3),
+  intent: z.enum(STYLING_INTENTS).default('default'),
+});
+
+const swapSchema = z.object({
+  keep_item_ids: z.array(z.string().uuid()).min(1),
+  replace_slot: z.enum(ITEM_CATEGORIES),
+  occasion: z.enum(OCCASION_TYPES).nullable().optional(),
+  weather: z
+    .object({
+      temperature_f: z.number(),
+      feels_like_f: z.number(),
+      humidity: z.number(),
+      precipitation_chance: z.number(),
+      uv_index: z.number(),
+      wind_speed_mph: z.number(),
+      condition: z.string(),
+    })
+    .nullable()
+    .optional(),
+});
+
+const signalEmitSchema = z.object({
+  signal_type: z.enum(SIGNAL_TYPES),
+  item_id: z.string().uuid().nullable().optional(),
+  outfit_id: z.string().uuid().nullable().optional(),
+  value: z.record(z.unknown()),
+  context: z.record(z.unknown()).nullable().optional(),
 });
 
 const todayContextSchema = z.object({
@@ -181,6 +223,88 @@ const CATEGORY_TO_SLOT: Record<ItemCategory, OutfitSlot | null> = {
   undergarments: null,
 };
 
+// ── Intent-Based Weight Profiles ─────────────────────────────
+
+interface ScoringWeights {
+  color: number;
+  formality: number;
+  occasion: number;
+  pattern: number;
+  recency: number;
+  weather: number;
+}
+
+const DEFAULT_WEIGHTS: ScoringWeights = {
+  color: 0.2,
+  formality: 0.15,
+  occasion: 0.2,
+  pattern: 0.1,
+  recency: 0.15,
+  weather: 0.2,
+};
+
+function getIntentWeights(intent: StylingIntent): ScoringWeights {
+  switch (intent) {
+    case 'comfort-first':
+      return { color: 0.1, formality: 0.1, occasion: 0.1, pattern: 0.1, recency: 0.2, weather: 0.4 };
+    case 'make-statement':
+      return { color: 0.35, formality: 0.1, occasion: 0.15, pattern: 0.15, recency: 0.05, weather: 0.2 };
+    case 'blend-in':
+      return { color: 0.1, formality: 0.2, occasion: 0.35, pattern: 0.15, recency: 0.1, weather: 0.1 };
+    case 'push-style':
+      return { color: 0.15, formality: 0.1, occasion: 0.15, pattern: 0.1, recency: 0.1, weather: 0.15 };
+    case 'surprise-me':
+      return { color: 0.15, formality: 0.1, occasion: 0.1, pattern: 0.15, recency: 0.05, weather: 0.15 };
+    case 'default':
+    default:
+      return DEFAULT_WEIGHTS;
+  }
+}
+
+// Intent-specific item scoring modifiers
+const NEUTRAL_COLORS = new Set(['black', 'navy', 'cream', 'grey', 'gray', 'white', 'beige', 'charcoal', 'khaki', 'tan', 'taupe']);
+const COMFORT_MATERIALS = new Set(['cotton', 'knit', 'cashmere', 'linen']);
+
+function intentItemBonus(item: WardrobeItem, intent: StylingIntent, recentWornIds: Set<string>): number {
+  let bonus = 0;
+
+  switch (intent) {
+    case 'comfort-first':
+      if (item.material && COMFORT_MATERIALS.has(item.material)) bonus += 0.15;
+      if (item.formality_level <= 2) bonus += 0.1;
+      if (recentWornIds.has(item.id)) bonus += 0.05; // favorites are comforting
+      break;
+
+    case 'make-statement':
+      // Prefer bold/contrasting, avoid recently worn
+      if (item.colors.length > 0 && !NEUTRAL_COLORS.has(item.colors[0].toLowerCase())) bonus += 0.15;
+      if (item.pattern !== 'solid') bonus += 0.1;
+      if (recentWornIds.has(item.id)) bonus -= 0.2;
+      break;
+
+    case 'blend-in':
+      // Prefer neutrals and solids
+      if (item.colors.every((c) => NEUTRAL_COLORS.has(c.toLowerCase()))) bonus += 0.2;
+      if (item.pattern === 'solid') bonus += 0.15;
+      break;
+
+    case 'push-style':
+      // Bias toward items with higher versatility (they bridge styles)
+      if (item.versatility_score != null && item.versatility_score >= 7) bonus += 0.15;
+      break;
+
+    case 'surprise-me':
+      // Prefer least-worn items
+      if (item.times_worn <= 2) bonus += 0.2;
+      if (!recentWornIds.has(item.id)) bonus += 0.1;
+      // Random spice
+      bonus += Math.random() * 0.15;
+      break;
+  }
+
+  return bonus;
+}
+
 // ── Outfit Generation (Hero Piece Heuristic) ──────────────────
 
 interface ScoredOutfit {
@@ -193,9 +317,12 @@ function scoreOutfitCombination(
   items: WardrobeItem[],
   occasion: OccasionType | null,
   weather: WeatherContext | null,
-  recentWornIds: Set<string>
+  recentWornIds: Set<string>,
+  intent: StylingIntent = 'default'
 ): number {
   if (items.length < 2) return 0;
+
+  const weights = getIntentWeights(intent);
 
   let totalScore = 0;
   let components = 0;
@@ -213,23 +340,42 @@ function scoreOutfitCombination(
   const formalities = items.map((i) => i.formality_level);
   const avgFormality = formalities.reduce((a, b) => a + b, 0) / formalities.length;
   const formalitySpread = Math.max(...formalities) - Math.min(...formalities);
-  const formalityConsistency = formalitySpread <= 1 ? 1.0 : formalitySpread <= 2 ? 0.6 : 0.2;
+  let formalityConsistency = formalitySpread <= 1 ? 1.0 : formalitySpread <= 2 ? 0.6 : 0.2;
+
+  // comfort-first: lower target formality by 1
+  if (intent === 'comfort-first' && occasion) {
+    const range = OCCASION_FORMALITY[occasion];
+    const lowered: [number, number] = [Math.max(1, range[0] - 1), Math.max(1, range[1] - 1)];
+    formalityConsistency = formalityMatch(Math.round(avgFormality), lowered);
+  }
 
   // 3. Occasion formality fit
   let occasionScore = 0.7; // neutral default
   if (occasion) {
     const range = OCCASION_FORMALITY[occasion];
-    occasionScore = formalityMatch(Math.round(avgFormality), range);
+    if (intent === 'blend-in') {
+      // Must match formality exactly
+      occasionScore = Math.round(avgFormality) >= range[0] && Math.round(avgFormality) <= range[1] ? 1.0 : 0.2;
+    } else {
+      occasionScore = formalityMatch(Math.round(avgFormality), range);
+    }
   }
 
   // 4. Style coherence — check if items share similar style tags via material + pattern
   const patterns = items.map((i) => i.pattern);
   const uniquePatterns = new Set(patterns);
-  const patternCohesion = uniquePatterns.size <= 2 ? 1.0 : uniquePatterns.size <= 3 ? 0.6 : 0.3;
+  let patternCohesion = uniquePatterns.size <= 2 ? 1.0 : uniquePatterns.size <= 3 ? 0.6 : 0.3;
+  // blend-in: prefer all solids
+  if (intent === 'blend-in') {
+    const allSolid = patterns.every((p) => p === 'solid');
+    patternCohesion = allSolid ? 1.0 : patternCohesion * 0.5;
+  }
 
   // 5. Recency penalty — avoid items worn in last 3 days
   const recentCount = items.filter((i) => recentWornIds.has(i.id)).length;
-  const recencyPenalty = recentCount === 0 ? 1.0 : recentCount === 1 ? 0.7 : 0.3;
+  let recencyPenalty = recentCount === 0 ? 1.0 : recentCount === 1 ? 0.7 : 0.3;
+  // make-statement: heavily penalize recent items
+  if (intent === 'make-statement' && recentCount > 0) recencyPenalty *= 0.5;
 
   // 6. Weather appropriateness
   let weatherAvg = 0.7;
@@ -238,16 +384,20 @@ function scoreOutfitCombination(
     weatherAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
   }
 
-  // Composite score (weighted)
-  const composite =
-    colorScore * 0.2 +
-    formalityConsistency * 0.15 +
-    occasionScore * 0.2 +
-    patternCohesion * 0.1 +
-    recencyPenalty * 0.15 +
-    weatherAvg * 0.2;
+  // 7. Intent item bonuses
+  const intentBonus = items.reduce((sum, item) => sum + intentItemBonus(item, intent, recentWornIds), 0) / items.length;
 
-  return Math.round(composite * 100) / 100;
+  // Composite score (weighted by intent)
+  const composite =
+    colorScore * weights.color +
+    formalityConsistency * weights.formality +
+    occasionScore * weights.occasion +
+    patternCohesion * weights.pattern +
+    recencyPenalty * weights.recency +
+    weatherAvg * weights.weather +
+    intentBonus * 0.15; // intent bonus is additive, capped at ~0.15
+
+  return Math.round(Math.min(1, composite) * 100) / 100;
 }
 
 function generateOutfits(
@@ -255,7 +405,8 @@ function generateOutfits(
   occasion: OccasionType | null,
   weather: WeatherContext | null,
   recentWornIds: Set<string>,
-  count: number
+  count: number,
+  intent: StylingIntent = 'default'
 ): ScoredOutfit[] {
   const season = getCurrentSeason();
 
@@ -309,6 +460,20 @@ function generateOutfits(
     s += (item.versatility_score ?? 5) / 10;
     // Slight randomness for variety
     s += Math.random() * 0.3;
+
+    // Intent-specific hero selection
+    if (intent === 'surprise-me') {
+      // Prefer least-worn items as hero pieces
+      s += Math.max(0, (5 - item.times_worn) / 5);
+      s += Math.random() * 0.5; // extra randomness
+    } else if (intent === 'make-statement') {
+      // Prefer bold-colored items as heroes
+      if (item.colors.length > 0 && !NEUTRAL_COLORS.has(item.colors[0].toLowerCase())) s += 1;
+      if (item.pattern !== 'solid') s += 0.5;
+    } else if (intent === 'comfort-first') {
+      if (item.material && COMFORT_MATERIALS.has(item.material)) s += 0.8;
+    }
+
     return s;
   }
 
@@ -325,7 +490,8 @@ function generateOutfits(
         score:
           colorHarmonyScore(heroItem.colors, c.colors) * 0.5 +
           (Math.abs(c.formality_level - heroItem.formality_level) <= 1 ? 0.3 : 0) +
-          (!recentWornIds.has(c.id) ? 0.2 : 0),
+          (!recentWornIds.has(c.id) ? 0.2 : 0) +
+          intentItemBonus(c, intent, recentWornIds),
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -397,7 +563,7 @@ function generateOutfits(
     }
 
     // Score the full combination
-    const score = scoreOutfitCombination(outfitItems, occasion, weather, recentWornIds);
+    const score = scoreOutfitCombination(outfitItems, occasion, weather, recentWornIds, intent);
 
     results.push({ items: outfitItems, score, hero_item_id: hero.id });
     usedHeroIds.add(hero.id);
@@ -542,7 +708,8 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
     body.occasion ?? null,
     weather,
     recentWornIds,
-    body.count
+    body.count,
+    body.intent
   );
 
   if (outfits.length === 0) {
@@ -586,6 +753,7 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
         hero_item_id: outfit.hero_item_id,
         occasion: body.occasion ?? null,
         weather: weather,
+        intent: body.intent,
       };
     })
   );
@@ -668,6 +836,155 @@ outfitSuggest.get('/today-context', zValidator('query', todayContextSchema), asy
     },
     error: null,
   });
+});
+
+// ── POST /outfits/suggest/swap ────────────────────────────────
+
+outfitSuggest.post('/suggest/swap', zValidator('json', swapSchema), async (c) => {
+  const supabase = c.get('supabase');
+  const body = c.req.valid('json');
+
+  // 1. Fetch the kept items to compute compatibility against
+  const { data: keptItems, error: keptError } = await supabase
+    .from('wardrobe_items')
+    .select('*')
+    .in('id', body.keep_item_ids);
+
+  if (keptError) {
+    return c.json(
+      { data: null, error: { code: 'QUERY_FAILED', message: keptError.message } },
+      400
+    );
+  }
+
+  const kept = (keptItems ?? []) as WardrobeItem[];
+  if (kept.length === 0) {
+    return c.json(
+      { data: null, error: { code: 'NOT_FOUND', message: 'No matching kept items found' } },
+      404
+    );
+  }
+
+  // 2. Fetch user's wardrobe items in the replace_slot category
+  const { data: candidates, error: candidatesError } = await supabase
+    .from('wardrobe_items')
+    .select('*')
+    .eq('category', body.replace_slot)
+    .eq('status', 'active')
+    .limit(200);
+
+  if (candidatesError) {
+    return c.json(
+      { data: null, error: { code: 'QUERY_FAILED', message: candidatesError.message } },
+      400
+    );
+  }
+
+  const candidateItems = (candidates ?? []) as WardrobeItem[];
+
+  if (candidateItems.length === 0) {
+    return c.json({
+      data: [],
+      error: null,
+      message: `No items found in category "${body.replace_slot}".`,
+    });
+  }
+
+  // 3. Exclude items already in the outfit
+  const keepIds = new Set(body.keep_item_ids);
+  const available = candidateItems.filter((item) => !keepIds.has(item.id));
+
+  if (available.length === 0) {
+    return c.json({
+      data: [],
+      error: null,
+      message: 'No alternative items available in this category.',
+    });
+  }
+
+  // 4. Score each candidate against kept items
+  const weather = body.weather ?? null;
+  const occasion = body.occasion ?? null;
+
+  const scored = available.map((candidate) => {
+    // Average color harmony against all kept items
+    let totalColorHarmony = 0;
+    for (const keptItem of kept) {
+      totalColorHarmony += colorHarmonyScore(keptItem.colors, candidate.colors);
+    }
+    const avgColorHarmony = kept.length > 0 ? totalColorHarmony / kept.length : 0.5;
+
+    // Formality consistency with kept items
+    const keptFormalities = kept.map((k) => k.formality_level);
+    const avgKeptFormality = keptFormalities.reduce((a, b) => a + b, 0) / keptFormalities.length;
+    const formalityDiff = Math.abs(candidate.formality_level - avgKeptFormality);
+    const formalityScore = formalityDiff <= 1 ? 1.0 : formalityDiff <= 2 ? 0.5 : 0.1;
+
+    // Occasion fit
+    let occasionFit = 0.7;
+    if (occasion) {
+      const range = OCCASION_FORMALITY[occasion];
+      occasionFit = formalityMatch(candidate.formality_level, range);
+    }
+
+    // Weather score
+    const wScore = weather ? weatherScore(candidate, weather) : 0.7;
+
+    // Pattern compatibility
+    const keptPatterns = new Set(kept.map((k) => k.pattern));
+    const patternFit = keptPatterns.has(candidate.pattern) || keptPatterns.size <= 1 ? 1.0 : 0.6;
+
+    const compatibility =
+      avgColorHarmony * 0.3 +
+      formalityScore * 0.25 +
+      occasionFit * 0.2 +
+      wScore * 0.15 +
+      patternFit * 0.1;
+
+    return {
+      id: candidate.id,
+      name: candidate.name,
+      category: candidate.category,
+      colors: candidate.colors,
+      image_url: candidate.image_url,
+      image_url_clean: candidate.image_url_clean,
+      formality_level: candidate.formality_level,
+      brand: candidate.brand,
+      compatibility_score: Math.round(compatibility * 100) / 100,
+    };
+  });
+
+  // 5. Sort by compatibility score, return top 8
+  scored.sort((a, b) => b.compatibility_score - a.compatibility_score);
+  const topAlternatives = scored.slice(0, 8);
+
+  return c.json({ data: topAlternatives, error: null });
+});
+
+// ── POST /signals/emit ───────────────────────────────────────
+
+outfitSuggest.post('/signals/emit', zValidator('json', signalEmitSchema), async (c) => {
+  const supabase = c.get('supabase');
+  const userId = c.get('userId');
+  const body = c.req.valid('json');
+
+  const { error } = await supabase.from('preference_signals').insert({
+    user_id: userId,
+    signal_type: body.signal_type,
+    item_id: body.item_id ?? null,
+    outfit_id: body.outfit_id ?? null,
+    value: body.value,
+    context: body.context ?? null,
+  });
+
+  if (error) {
+    return c.json(
+      { data: null, error: { code: 'INSERT_FAILED', message: error.message } },
+      400
+    );
+  }
+
+  return c.json({ data: { success: true }, error: null });
 });
 
 export default outfitSuggest;

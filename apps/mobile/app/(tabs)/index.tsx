@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Image,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +22,17 @@ import {
   suggestOutfits,
   getTodayContext,
   createOutfit,
+  swapOutfitItem,
+  emitPreferenceSignal,
+  DISMISS_REASONS,
+  STYLING_INTENTS,
+  INTENT_DISPLAY,
   type SuggestedOutfit,
+  type SuggestedOutfitItem,
+  type SwapAlternative,
   type TodayContext,
+  type StylingIntent,
+  type DismissReason,
 } from '../../lib/api';
 import { colors, fonts, spacing, radii, typography } from '../../lib/theme';
 
@@ -29,7 +40,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 48;
 const CARD_MARGIN = 8;
 
-// ── Greeting Helper ───────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────
 
 function getGreeting(timeOfDay: 'morning' | 'afternoon' | 'evening'): string {
   switch (timeOfDay) {
@@ -55,16 +66,262 @@ function getWeatherIcon(condition: string): string {
   return map[condition.toLowerCase()] ?? 'partly-sunny-outline';
 }
 
+function inferDefaultIntent(todayContext: TodayContext | undefined): StylingIntent {
+  if (!todayContext) return 'default';
+  if (todayContext.active_style_goal) return 'push-style';
+  if (todayContext.is_weekend) return 'comfort-first';
+  if (todayContext.time_of_day === 'evening') return 'make-statement';
+  return 'default'; // weekday morning/afternoon = polished
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  tops: 'shirt-outline',
+  bottoms: 'resize-outline',
+  dresses: 'flower-outline',
+  outerwear: 'snow-outline',
+  shoes: 'footsteps-outline',
+  accessories: 'watch-outline',
+  bags: 'bag-outline',
+  jewelry: 'diamond-outline',
+  activewear: 'barbell-outline',
+};
+
+function colorToCss(name: string): string {
+  const map: Record<string, string> = {
+    white: '#f0f0f0', black: '#2D2926', navy: '#1a3a5c', cream: '#f5f0e8',
+    khaki: '#c3b091', camel: '#c19a6b', indigo: '#3f51b5', nude: '#e3bc9a',
+    tan: '#d2b48c', gold: '#d4a04a', 'dusty-rose': '#c9a0a0', grey: '#9e9e9e',
+    gray: '#9e9e9e', beige: '#d4c5a9', brown: '#795548', red: '#c62828',
+    blue: '#1565c0', green: '#2e7d32', pink: '#e91e63', purple: '#7b1fa2',
+    orange: '#e65100', yellow: '#f9a825', teal: '#00897b', burgundy: '#6d1b2a',
+    olive: '#556b2f', coral: '#ff6f61', sage: '#9caf88',
+  };
+  return map[name.toLowerCase()] ?? colors.textMuted;
+}
+
+// ── Swap Bottom Sheet ───────────────────────────────────────────
+
+function SwapSheet({
+  visible,
+  onClose,
+  item,
+  alternatives,
+  isLoading,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  item: SuggestedOutfitItem | null;
+  alternatives: SwapAlternative[];
+  isLoading: boolean;
+  onSelect: (alt: SwapAlternative) => void;
+}) {
+  if (!item) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable style={sheetStyles.backdrop} onPress={onClose}>
+        <View />
+      </Pressable>
+      <View style={sheetStyles.sheet}>
+        <View style={sheetStyles.handle} />
+        <Text style={sheetStyles.title}>
+          Swap {item.category}
+        </Text>
+
+        {/* Current item */}
+        <View style={sheetStyles.currentItem}>
+          {(item.image_url_clean || item.image_url) ? (
+            <Image
+              source={{ uri: item.image_url_clean ?? item.image_url ?? '' }}
+              style={sheetStyles.currentImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[sheetStyles.currentImage, sheetStyles.currentImagePlaceholder]}>
+              <Ionicons
+                name={(CATEGORY_ICONS[item.category] ?? 'ellipse-outline') as any}
+                size={20}
+                color={colors.textMuted}
+              />
+            </View>
+          )}
+          <View style={sheetStyles.currentInfo}>
+            <Text style={sheetStyles.currentName} numberOfLines={1}>{item.name}</Text>
+            <Text style={sheetStyles.currentLabel}>Current</Text>
+          </View>
+        </View>
+
+        <View style={sheetStyles.divider} />
+
+        {isLoading ? (
+          <View style={sheetStyles.loadingBox}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={sheetStyles.loadingLabel}>Finding alternatives...</Text>
+          </View>
+        ) : alternatives.length === 0 ? (
+          <Text style={sheetStyles.emptyLabel}>
+            No alternatives in this category.
+          </Text>
+        ) : (
+          <ScrollView
+            style={sheetStyles.altScroll}
+            contentContainerStyle={sheetStyles.altGrid}
+            showsVerticalScrollIndicator={false}
+          >
+            {alternatives.map((alt) => (
+              <Pressable
+                key={alt.id}
+                style={sheetStyles.altCard}
+                onPress={() => onSelect(alt)}
+              >
+                {(alt.image_url_clean || alt.image_url) ? (
+                  <Image
+                    source={{ uri: alt.image_url_clean ?? alt.image_url ?? '' }}
+                    style={sheetStyles.altImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[sheetStyles.altImage, sheetStyles.altImagePlaceholder]}>
+                    <Ionicons
+                      name={(CATEGORY_ICONS[alt.category] ?? 'ellipse-outline') as any}
+                      size={18}
+                      color={colors.textMuted}
+                    />
+                  </View>
+                )}
+                <Text style={sheetStyles.altName} numberOfLines={1}>{alt.name}</Text>
+                <View style={sheetStyles.altScoreBadge}>
+                  <Text style={sheetStyles.altScoreText}>
+                    {Math.round(alt.compatibility_score * 100)}%
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// ── Dismiss Reason Overlay ──────────────────────────────────────
+
+function DismissOverlay({
+  visible,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  onSelect: (reason: DismissReason) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable style={dismissStyles.backdrop} onPress={onClose}>
+        <View />
+      </Pressable>
+      <View style={dismissStyles.container}>
+        <Text style={dismissStyles.title}>Why skip this outfit?</Text>
+        <View style={dismissStyles.reasonRow}>
+          {DISMISS_REASONS.map((r) => (
+            <Pressable
+              key={r.key}
+              style={dismissStyles.reasonChip}
+              onPress={() => onSelect(r.key)}
+            >
+              <Text style={dismissStyles.reasonText}>{r.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Intent Picker Modal ─────────────────────────────────────────
+
+function IntentPicker({
+  visible,
+  onSelect,
+  onClose,
+  current,
+}: {
+  visible: boolean;
+  onSelect: (intent: StylingIntent) => void;
+  onClose: () => void;
+  current: StylingIntent;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable style={sheetStyles.backdrop} onPress={onClose}>
+        <View />
+      </Pressable>
+      <View style={intentStyles.sheet}>
+        <View style={sheetStyles.handle} />
+        <Text style={intentStyles.title}>Choose your vibe</Text>
+        {STYLING_INTENTS.map((intent) => {
+          const info = INTENT_DISPLAY[intent];
+          const isActive = intent === current;
+          return (
+            <Pressable
+              key={intent}
+              style={[intentStyles.option, isActive && intentStyles.optionActive]}
+              onPress={() => onSelect(intent)}
+            >
+              <View style={[intentStyles.iconCircle, isActive && intentStyles.iconCircleActive]}>
+                <Ionicons
+                  name={info.icon as any}
+                  size={20}
+                  color={isActive ? '#fff' : colors.accent}
+                />
+              </View>
+              <View style={intentStyles.optionTextWrap}>
+                <Text style={[intentStyles.optionLabel, isActive && intentStyles.optionLabelActive]}>
+                  {info.label}
+                </Text>
+                <Text style={intentStyles.optionDesc}>{info.description}</Text>
+              </View>
+              {isActive && (
+                <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+    </Modal>
+  );
+}
+
 // ── Outfit Card Component ─────────────────────────────────────
 
 function OutfitCard({
   outfit,
   onWearIt,
   isLogging,
+  onItemTap,
+  onDismiss,
 }: {
   outfit: SuggestedOutfit;
   onWearIt: () => void;
   isLogging: boolean;
+  onItemTap: (item: SuggestedOutfitItem) => void;
+  onDismiss: () => void;
 }) {
   const itemImages = outfit.items.filter(
     (i) => i.image_url_clean || i.image_url
@@ -72,11 +329,22 @@ function OutfitCard({
 
   return (
     <View style={cardStyles.card}>
-      {/* Item thumbnails grid */}
+      {/* Dismiss X button */}
+      <Pressable
+        style={cardStyles.dismissButton}
+        onPress={onDismiss}
+        hitSlop={8}
+        accessibilityLabel="Dismiss outfit"
+        accessibilityRole="button"
+      >
+        <Ionicons name="close" size={18} color={colors.textSecondary} />
+      </Pressable>
+
+      {/* Item thumbnails grid — each item is tappable */}
       <View style={cardStyles.thumbnailGrid}>
         {itemImages.length > 0 ? (
           itemImages.slice(0, 4).map((item, idx) => (
-            <View
+            <Pressable
               key={item.id}
               style={[
                 cardStyles.thumbnailContainer,
@@ -84,12 +352,17 @@ function OutfitCard({
                 itemImages.length === 2 && cardStyles.thumbnailHalf,
                 itemImages.length >= 3 && cardStyles.thumbnailQuarter,
               ]}
+              onPress={() => onItemTap(item)}
             >
               <Image
                 source={{ uri: item.image_url_clean ?? item.image_url ?? '' }}
                 style={cardStyles.thumbnailImage}
                 resizeMode="cover"
               />
+              {/* Swap hint badge */}
+              <View style={cardStyles.swapHint}>
+                <Ionicons name="swap-horizontal" size={10} color="#fff" />
+              </View>
               {idx === 3 && itemImages.length > 4 && (
                 <View style={cardStyles.moreOverlay}>
                   <Text style={cardStyles.moreText}>
@@ -97,26 +370,19 @@ function OutfitCard({
                   </Text>
                 </View>
               )}
-            </View>
+            </Pressable>
           ))
         ) : (
           <View style={cardStyles.itemChipsGrid}>
             {outfit.items.slice(0, 6).map((item) => {
-              const categoryIcons: Record<string, string> = {
-                tops: 'shirt-outline',
-                bottoms: 'resize-outline',
-                dresses: 'flower-outline',
-                outerwear: 'snow-outline',
-                shoes: 'footsteps-outline',
-                accessories: 'watch-outline',
-                bags: 'bag-outline',
-                jewelry: 'diamond-outline',
-                activewear: 'barbell-outline',
-              };
-              const iconName = categoryIcons[item.category] ?? 'ellipse-outline';
+              const iconName = CATEGORY_ICONS[item.category] ?? 'ellipse-outline';
               const dominantColor = item.colors?.[0] ?? 'gray';
               return (
-                <View key={item.id} style={cardStyles.itemChip}>
+                <Pressable
+                  key={item.id}
+                  style={cardStyles.itemChip}
+                  onPress={() => onItemTap(item)}
+                >
                   <Ionicons name={iconName as any} size={18} color={colors.secondary} />
                   <Text style={cardStyles.itemChipName} numberOfLines={1}>
                     {item.name.split(' ').slice(0, 3).join(' ')}
@@ -124,10 +390,10 @@ function OutfitCard({
                   <View
                     style={[
                       cardStyles.colorDot,
-                      { backgroundColor: dominantColor === 'white' ? '#f0f0f0' : dominantColor === 'black' ? '#2D2926' : dominantColor === 'navy' ? '#1a3a5c' : dominantColor === 'cream' ? '#f5f0e8' : dominantColor === 'khaki' ? '#c3b091' : dominantColor === 'camel' ? '#c19a6b' : dominantColor === 'indigo' ? '#3f51b5' : dominantColor === 'nude' ? '#e3bc9a' : dominantColor === 'tan' ? '#d2b48c' : dominantColor === 'gold' ? '#d4a04a' : dominantColor === 'dusty-rose' ? '#c9a0a0' : colors.textMuted },
+                      { backgroundColor: colorToCss(dominantColor) },
                     ]}
                   />
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -196,6 +462,24 @@ export default function TodayScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
 
+  // Feature 1: Swap state
+  const [swapItem, setSwapItem] = useState<SuggestedOutfitItem | null>(null);
+  const [swapOutfitId, setSwapOutfitId] = useState<string | null>(null);
+  const [swapSheetVisible, setSwapSheetVisible] = useState(false);
+
+  // Feature 2: Dismiss state
+  const [dismissOutfitId, setDismissOutfitId] = useState<string | null>(null);
+  const [dismissVisible, setDismissVisible] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+
+  // Feature 3: Intent state
+  const [activeIntent, setActiveIntent] = useState<StylingIntent>('default');
+  const [intentPickerVisible, setIntentPickerVisible] = useState(false);
+  const [intentInitialized, setIntentInitialized] = useState(false);
+
+  // Local outfit state for swaps (copy of suggestions that we can mutate)
+  const [localOutfits, setLocalOutfits] = useState<SuggestedOutfit[]>([]);
+
   // Request location on mount
   useEffect(() => {
     (async () => {
@@ -216,7 +500,7 @@ export default function TodayScreen() {
     })();
   }, []);
 
-  // Fetch today context (pass local timezone offset so server computes correct time-of-day)
+  // Fetch today context
   const {
     data: contextData,
     isLoading: contextLoading,
@@ -225,12 +509,20 @@ export default function TodayScreen() {
     queryFn: () =>
       getTodayContext(location?.lat, location?.lon, new Date().getTimezoneOffset()),
     enabled: true,
-    staleTime: 5 * 60 * 1000, // 5 min
+    staleTime: 5 * 60 * 1000,
   });
 
   const todayContext = contextData?.data;
 
-  // Fetch outfit suggestions
+  // Initialize intent from context once
+  useEffect(() => {
+    if (todayContext && !intentInitialized) {
+      setActiveIntent(inferDefaultIntent(todayContext));
+      setIntentInitialized(true);
+    }
+  }, [todayContext, intentInitialized]);
+
+  // Fetch outfit suggestions (includes intent)
   const {
     data: suggestionsData,
     isLoading: suggestionsLoading,
@@ -238,21 +530,162 @@ export default function TodayScreen() {
     error: suggestionsErrorObj,
     refetch: refetchSuggestions,
   } = useQuery({
-    queryKey: ['outfit-suggestions', location?.lat, location?.lon, todayContext?.inferred_occasion],
+    queryKey: ['outfit-suggestions', location?.lat, location?.lon, todayContext?.inferred_occasion, activeIntent],
     queryFn: () =>
       suggestOutfits({
         occasion: todayContext?.inferred_occasion ?? null,
         lat: location?.lat,
         lon: location?.lon,
-        count: 3,
+        count: 5,
+        intent: activeIntent,
       }),
     enabled: todayContext != null || !contextLoading,
-    staleTime: 10 * 60 * 1000, // 10 min
+    staleTime: 10 * 60 * 1000,
   });
 
-  const suggestions = suggestionsData?.data ?? [];
+  // Sync server suggestions into local state
+  useEffect(() => {
+    if (suggestionsData?.data) {
+      setLocalOutfits(suggestionsData.data);
+      setDismissedIds(new Set());
+      setCurrentIndex(0);
+    }
+  }, [suggestionsData]);
 
-  // Wear It mutation
+  const visibleOutfits = useMemo(
+    () => localOutfits.filter((o) => !dismissedIds.has(o.id)),
+    [localOutfits, dismissedIds]
+  );
+
+  // ── Swap mutation ──────────────────────────────────────────
+  const swapMutation = useMutation({
+    mutationFn: async (params: { keepIds: string[]; replaceSlot: string; outfitId: string }) => {
+      const outfit = localOutfits.find((o) => o.id === params.outfitId);
+      return swapOutfitItem({
+        keep_item_ids: params.keepIds,
+        replace_slot: params.replaceSlot,
+        occasion: outfit?.occasion,
+        weather: outfit?.weather,
+      });
+    },
+  });
+
+  const handleItemTap = useCallback(
+    (outfitId: string, item: SuggestedOutfitItem) => {
+      setSwapItem(item);
+      setSwapOutfitId(outfitId);
+      setSwapSheetVisible(true);
+
+      const outfit = localOutfits.find((o) => o.id === outfitId);
+      if (!outfit) return;
+
+      const keepIds = outfit.items.filter((i) => i.id !== item.id).map((i) => i.id);
+      swapMutation.mutate({
+        keepIds,
+        replaceSlot: item.category,
+        outfitId,
+      });
+    },
+    [localOutfits, swapMutation]
+  );
+
+  const handleSwapSelect = useCallback(
+    (alt: SwapAlternative) => {
+      if (!swapOutfitId || !swapItem) return;
+
+      setLocalOutfits((prev) =>
+        prev.map((outfit) => {
+          if (outfit.id !== swapOutfitId) return outfit;
+
+          const newItems = outfit.items.map((i) =>
+            i.id === swapItem.id
+              ? {
+                  id: alt.id,
+                  name: alt.name,
+                  category: alt.category,
+                  colors: alt.colors,
+                  image_url: alt.image_url,
+                  image_url_clean: alt.image_url_clean,
+                  formality_level: alt.formality_level,
+                  brand: alt.brand,
+                }
+              : i
+          );
+
+          // Recompute name + score estimate
+          const heroItem = newItems[0];
+          const primaryColor = heroItem.colors[0] ?? '';
+          const colorPrefix = primaryColor
+            ? primaryColor.charAt(0).toUpperCase() + primaryColor.slice(1) + ' '
+            : '';
+          const heroName = heroItem.name.split(' ').slice(0, 2).join(' ');
+          const newName = outfit.occasion
+            ? `${outfit.occasion.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}: ${colorPrefix}${heroName}`
+            : `${colorPrefix}${heroName} Look`;
+
+          // Recalculate happiness from compatibility score
+          const newHappiness = Math.min(
+            10,
+            Math.max(0, outfit.happiness_estimate * 0.7 + alt.compatibility_score * 3)
+          );
+
+          return {
+            ...outfit,
+            items: newItems,
+            name: newName,
+            happiness_estimate: Math.round(newHappiness * 10) / 10,
+          };
+        })
+      );
+
+      setSwapSheetVisible(false);
+      setSwapItem(null);
+      setSwapOutfitId(null);
+    },
+    [swapOutfitId, swapItem]
+  );
+
+  // ── Dismiss mutation ───────────────────────────────────────
+  const dismissMutation = useMutation({
+    mutationFn: async (params: { outfitId: string; reason: DismissReason }) => {
+      return emitPreferenceSignal({
+        signal_type: 'skipped',
+        outfit_id: params.outfitId,
+        value: { reason: params.reason, source: 'today_screen' },
+        context: todayContext
+          ? { occasion: todayContext.inferred_occasion, is_weekend: todayContext.is_weekend }
+          : null,
+      });
+    },
+  });
+
+  const handleDismissPress = useCallback((outfitId: string) => {
+    setDismissOutfitId(outfitId);
+    setDismissVisible(true);
+  }, []);
+
+  const handleDismissReason = useCallback(
+    (reason: DismissReason) => {
+      if (!dismissOutfitId) return;
+      dismissMutation.mutate({ outfitId: dismissOutfitId, reason });
+      setDismissedIds((prev) => new Set(prev).add(dismissOutfitId));
+      setDismissVisible(false);
+      setDismissOutfitId(null);
+    },
+    [dismissOutfitId, dismissMutation]
+  );
+
+  // ── Intent change ──────────────────────────────────────────
+  const handleIntentChange = useCallback(
+    (intent: StylingIntent) => {
+      setActiveIntent(intent);
+      setIntentPickerVisible(false);
+      // Query will auto-refetch due to queryKey including activeIntent
+    },
+    []
+  );
+
+  // ── Wear It mutation ───────────────────────────────────────
   const wearMutation = useMutation({
     mutationFn: async (outfit: SuggestedOutfit) => {
       return createOutfit({
@@ -284,9 +717,9 @@ export default function TodayScreen() {
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = e.nativeEvent.contentOffset.x;
       const index = Math.round(offsetX / (CARD_WIDTH + CARD_MARGIN * 2));
-      setCurrentIndex(Math.max(0, Math.min(index, suggestions.length - 1)));
+      setCurrentIndex(Math.max(0, Math.min(index, visibleOutfits.length - 1)));
     },
-    [suggestions.length]
+    [visibleOutfits.length]
   );
 
   const handleWearIt = useCallback(
@@ -333,10 +766,12 @@ export default function TodayScreen() {
     );
   }
 
+  const intentInfo = INTENT_DISPLAY[activeIntent];
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={[1]} // single-item list to enable pull-to-refresh on the whole page
+        data={[1]}
         keyExtractor={() => 'today'}
         renderItem={() => (
           <View>
@@ -372,6 +807,24 @@ export default function TodayScreen() {
               )}
             </View>
 
+            {/* ── Intent Bar (Feature 3) ─────────────── */}
+            {!isLoading && (todayContext?.wardrobe_item_count ?? 0) > 0 && (
+              <View style={styles.intentBar}>
+                <View style={styles.intentLabelRow}>
+                  <Text style={styles.intentCaption}>TODAY'S VIBE:</Text>
+                  <Text style={styles.intentValue}>
+                    {intentInfo.label.toUpperCase()}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.intentChangeButton}
+                  onPress={() => setIntentPickerVisible(true)}
+                >
+                  <Text style={styles.intentChangeText}>change</Text>
+                </Pressable>
+              </View>
+            )}
+
             {/* ── Loading State ─────────────────────────── */}
             {isLoading && (
               <View style={styles.loadingContainer}>
@@ -405,7 +858,7 @@ export default function TodayScreen() {
             {/* ── No Suggestions State ─────────────────── */}
             {!isLoading &&
               !suggestionsError &&
-              suggestions.length === 0 &&
+              visibleOutfits.length === 0 &&
               (todayContext?.wardrobe_item_count ?? 0) > 0 && (
                 <View style={styles.noSuggestionsContainer}>
                   <Ionicons
@@ -414,23 +867,27 @@ export default function TodayScreen() {
                     color={colors.textMuted}
                   />
                   <Text style={styles.noSuggestionsTitle}>
-                    Need more variety
+                    {dismissedIds.size > 0 ? 'All outfits dismissed' : 'Need more variety'}
                   </Text>
                   <Text style={styles.noSuggestionsText}>
-                    Add tops and bottoms to unlock outfit suggestions.
+                    {dismissedIds.size > 0
+                      ? 'Pull down to refresh for new suggestions.'
+                      : 'Add tops and bottoms to unlock outfit suggestions.'}
                   </Text>
-                  <Pressable
-                    style={styles.primaryButton}
-                    onPress={() => router.push('/add-item')}
-                  >
-                    <Ionicons name="add" size={20} color="#fff" />
-                    <Text style={styles.primaryButtonText}>Add Item</Text>
-                  </Pressable>
+                  {dismissedIds.size === 0 && (
+                    <Pressable
+                      style={styles.primaryButton}
+                      onPress={() => router.push('/add-item')}
+                    >
+                      <Ionicons name="add" size={20} color="#fff" />
+                      <Text style={styles.primaryButtonText}>Add Item</Text>
+                    </Pressable>
+                  )}
                 </View>
               )}
 
             {/* ── Outfit Cards (Horizontal Swipe) ─────── */}
-            {!isLoading && suggestions.length > 0 && (
+            {!isLoading && visibleOutfits.length > 0 && (
               <View>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>
@@ -440,7 +897,7 @@ export default function TodayScreen() {
 
                 <FlatList
                   ref={flatListRef}
-                  data={suggestions}
+                  data={visibleOutfits}
                   keyExtractor={(item) => item.id}
                   horizontal
                   pagingEnabled={false}
@@ -465,15 +922,17 @@ export default function TodayScreen() {
                           loggedIds.has(item.id) ||
                           wearMutation.isPending
                         }
+                        onItemTap={(tapItem) => handleItemTap(item.id, tapItem)}
+                        onDismiss={() => handleDismissPress(item.id)}
                       />
                     </View>
                   )}
                 />
 
                 {/* Pagination dots */}
-                {suggestions.length > 1 && (
+                {visibleOutfits.length > 1 && (
                   <View style={styles.paginationContainer}>
-                    {suggestions.map((_, idx) => (
+                    {visibleOutfits.map((_, idx) => (
                       <View
                         key={idx}
                         style={[
@@ -483,7 +942,7 @@ export default function TodayScreen() {
                       />
                     ))}
                     <Text style={styles.paginationText}>
-                      {currentIndex + 1} of {suggestions.length}
+                      {currentIndex + 1} of {visibleOutfits.length}
                     </Text>
                   </View>
                 )}
@@ -573,9 +1032,271 @@ export default function TodayScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       />
+
+      {/* ── Modals ──────────────────────────────────── */}
+      <SwapSheet
+        visible={swapSheetVisible}
+        onClose={() => {
+          setSwapSheetVisible(false);
+          setSwapItem(null);
+          setSwapOutfitId(null);
+        }}
+        item={swapItem}
+        alternatives={swapMutation.data?.data ?? []}
+        isLoading={swapMutation.isPending}
+        onSelect={handleSwapSelect}
+      />
+
+      <DismissOverlay
+        visible={dismissVisible}
+        onSelect={handleDismissReason}
+        onClose={() => {
+          setDismissVisible(false);
+          setDismissOutfitId(null);
+        }}
+      />
+
+      <IntentPicker
+        visible={intentPickerVisible}
+        onSelect={handleIntentChange}
+        onClose={() => setIntentPickerVisible(false)}
+        current={activeIntent}
+      />
     </View>
   );
 }
+
+// ── Swap Sheet Styles ───────────────────────────────────────────
+
+const sheetStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  title: {
+    fontFamily: fonts.cormorant.semibold,
+    fontSize: 22,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 16,
+    textTransform: 'capitalize',
+  },
+  currentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  currentImage: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.sm,
+  },
+  currentImagePlaceholder: {
+    backgroundColor: colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currentInfo: {
+    flex: 1,
+  },
+  currentName: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textPrimary,
+  },
+  currentLabel: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginBottom: 12,
+  },
+  loadingBox: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    gap: 8,
+  },
+  loadingLabel: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  emptyLabel: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 24,
+  },
+  altScroll: {
+    flexGrow: 0,
+  },
+  altGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingBottom: 20,
+  },
+  altCard: {
+    width: (SCREEN_WIDTH - 60) / 4 - 10,
+    alignItems: 'center',
+  },
+  altImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: radii.sm,
+    marginBottom: 4,
+  },
+  altImagePlaceholder: {
+    backgroundColor: colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  altName: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 10,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  altScoreBadge: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+  },
+  altScoreText: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 10,
+    fontWeight: '500',
+    color: colors.accent,
+  },
+});
+
+// ── Dismiss Overlay Styles ──────────────────────────────────────
+
+const dismissStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  container: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  title: {
+    fontFamily: fonts.cormorant.semibold,
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 16,
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reasonChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radii.full,
+    backgroundColor: colors.accentSoft,
+  },
+  reasonText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.secondary,
+  },
+});
+
+// ── Intent Picker Styles ────────────────────────────────────────
+
+const intentStyles = StyleSheet.create({
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  title: {
+    fontFamily: fonts.cormorant.semibold,
+    fontSize: 22,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 16,
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: radii.lg,
+    marginBottom: 4,
+  },
+  optionActive: {
+    backgroundColor: colors.accentSoft,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconCircleActive: {
+    backgroundColor: colors.accent,
+  },
+  optionTextWrap: {
+    flex: 1,
+  },
+  optionLabel: {
+    fontFamily: fonts.inter.semibold,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  optionLabelActive: {
+    color: colors.accent,
+  },
+  optionDesc: {
+    fontFamily: fonts.inter.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+});
 
 // ── Outfit Card Styles ────────────────────────────────────────
 
@@ -589,6 +1310,23 @@ const cardStyles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
+  },
+  dismissButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 2,
   },
   thumbnailGrid: {
     flexDirection: 'row',
@@ -613,6 +1351,17 @@ const cardStyles = StyleSheet.create({
   thumbnailImage: {
     width: '100%',
     height: '100%',
+  },
+  swapHint: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   noImageContainer: {
     width: '100%',
@@ -744,7 +1493,7 @@ const styles = StyleSheet.create({
   contextBar: {
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   greeting: {
     fontFamily: fonts.cormorant.semibold,
@@ -770,6 +1519,51 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
     textTransform: 'capitalize',
+  },
+  // Intent bar
+  intentBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 24,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.lg,
+  },
+  intentLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  intentCaption: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 1,
+    color: colors.textSecondary,
+  },
+  intentValue: {
+    fontFamily: fonts.inter.semibold,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    color: colors.accent,
+  },
+  intentChangeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  intentChangeText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.accent,
   },
   // Section header
   sectionHeader: {

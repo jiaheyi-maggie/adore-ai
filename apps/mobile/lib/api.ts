@@ -449,6 +449,27 @@ export async function getWeatherForLocation(
 
 // ── Outfit Suggestions API ──────────────────────────────────
 
+// ── Styling Intents ──────────────────────────────────────────
+
+export const STYLING_INTENTS = [
+  'default',
+  'comfort-first',
+  'make-statement',
+  'blend-in',
+  'push-style',
+  'surprise-me',
+] as const;
+export type StylingIntent = (typeof STYLING_INTENTS)[number];
+
+export const INTENT_DISPLAY: Record<StylingIntent, { label: string; icon: string; description: string }> = {
+  'default': { label: 'Polished', icon: 'sparkles-outline', description: 'Balanced and put-together' },
+  'comfort-first': { label: 'Comfort First', icon: 'bed-outline', description: 'Soft fabrics, relaxed fit' },
+  'make-statement': { label: 'Make a Statement', icon: 'flame-outline', description: 'Bold colors, standout pieces' },
+  'blend-in': { label: 'Blend In', icon: 'eye-off-outline', description: 'Neutrals, clean lines' },
+  'push-style': { label: 'Push My Style', icon: 'trending-up-outline', description: 'Move toward your style goal' },
+  'surprise-me': { label: 'Surprise Me', icon: 'dice-outline', description: 'Fresh combos, least-worn items' },
+};
+
 export interface SuggestOutfitsParams {
   occasion?: OccasionType | null;
   weather?: WeatherContext | null;
@@ -457,6 +478,7 @@ export interface SuggestOutfitsParams {
   mood?: string | null;
   style_shift_goal_id?: string | null;
   count?: number;
+  intent?: StylingIntent;
 }
 
 export interface SuggestedOutfitItem {
@@ -480,6 +502,7 @@ export interface SuggestedOutfit {
   hero_item_id: string;
   occasion: OccasionType | null;
   weather: WeatherContext | null;
+  intent?: StylingIntent;
 }
 
 export interface SuggestOutfitsResponse {
@@ -496,6 +519,66 @@ export async function suggestOutfits(
     body: JSON.stringify(params),
   });
 }
+
+// ── Swap Outfit Item API ─────────────────────────────────────
+
+export interface SwapAlternative {
+  id: string;
+  name: string;
+  category: string;
+  colors: string[];
+  image_url: string | null;
+  image_url_clean: string | null;
+  formality_level: number;
+  brand: string | null;
+  compatibility_score: number;
+}
+
+export interface SwapOutfitItemParams {
+  keep_item_ids: string[];
+  replace_slot: string;
+  occasion?: OccasionType | null;
+  weather?: WeatherContext | null;
+}
+
+export async function swapOutfitItem(
+  params: SwapOutfitItemParams
+): Promise<ApiResponse<SwapAlternative[]>> {
+  return apiFetch<ApiResponse<SwapAlternative[]>>('/outfits/suggest/swap', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+// ── Preference Signal API ────────────────────────────────────
+
+export interface EmitSignalParams {
+  signal_type: string;
+  item_id?: string | null;
+  outfit_id?: string | null;
+  value: Record<string, unknown>;
+  context?: Record<string, unknown> | null;
+}
+
+export async function emitPreferenceSignal(
+  signal: EmitSignalParams
+): Promise<ApiResponse<{ success: boolean }>> {
+  return apiFetch<ApiResponse<{ success: boolean }>>('/outfits/signals/emit', {
+    method: 'POST',
+    body: JSON.stringify(signal),
+  });
+}
+
+// ── Dismiss Reasons ──────────────────────────────────────────
+
+export const DISMISS_REASONS = [
+  { key: 'too_formal', label: 'Too formal' },
+  { key: 'too_casual', label: 'Too casual' },
+  { key: 'wrong_colors', label: 'Wrong colors' },
+  { key: 'not_my_style', label: 'Not my style' },
+  { key: 'just_skip', label: 'Just skip' },
+] as const;
+export type DismissReason = (typeof DISMISS_REASONS)[number]['key'];
 
 export interface TodayContext {
   user_name: string | null;
