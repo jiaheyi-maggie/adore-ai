@@ -203,7 +203,7 @@ export default function StyleShiftScreen() {
   }, []);
 
   const handleTrackProgress = useCallback(() => {
-    router.back();
+    router.navigate('/profile');
   }, [router]);
 
   // ── Render Steps ────────────────────────────────────────────
@@ -224,7 +224,7 @@ export default function StyleShiftScreen() {
         <Pressable
           onPress={() => {
             if (step === 'choose-direction') {
-              router.back();
+              router.navigate('/profile');
             } else if (step === 'choose-intensity') {
               setStep('choose-direction');
             } else if (step === 'closet-reseen') {
@@ -234,7 +234,7 @@ export default function StyleShiftScreen() {
             } else if (step === 'shopping-list') {
               setStep('bridge-outfits');
             } else {
-              router.back();
+              router.navigate('/profile');
             }
           }}
           hitSlop={12}
@@ -717,7 +717,14 @@ function BridgeOutfitsStep({
 
             <View style={styles.outfitItems}>
               {outfit.items.map((oi) => (
-                <View key={oi.id} style={styles.outfitItemThumb}>
+                <Pressable
+                  key={oi.id}
+                  style={styles.outfitItemThumb}
+                  onPress={() => Alert.alert(
+                    oi.name,
+                    `Category: ${oi.category}\nColors: ${oi.colors?.join(', ') ?? 'N/A'}\nMaterial: ${oi.material ?? 'N/A'}\nBrand: ${oi.brand ?? 'N/A'}\nFormality: ${oi.formality_level}/5`,
+                  )}
+                >
                   {oi.image_url_clean || oi.image_url ? (
                     <Image
                       source={{ uri: oi.image_url_clean ?? oi.image_url ?? '' }}
@@ -731,7 +738,7 @@ function BridgeOutfitsStep({
                   <Text style={styles.outfitItemName} numberOfLines={1}>
                     {oi.name}
                   </Text>
-                </View>
+                </Pressable>
               ))}
             </View>
 
