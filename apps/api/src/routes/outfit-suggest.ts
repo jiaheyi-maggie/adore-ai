@@ -44,6 +44,7 @@ const suggestSchema = z.object({
 const todayContextSchema = z.object({
   lat: z.coerce.number().min(-90).max(90).optional(),
   lon: z.coerce.number().min(-180).max(180).optional(),
+  tz_offset_minutes: z.coerce.number().min(-720).max(840).optional(),
 });
 
 // ── Color Harmony ─────────────────────────────────────────────
@@ -90,8 +91,8 @@ function colorHarmonyScore(colorsA: string[], colorsB: string[]): number {
 
 // ── Season Helpers ────────────────────────────────────────────
 
-function getCurrentSeason(): Season {
-  const month = new Date().getMonth();
+function getCurrentSeason(now?: Date): Season {
+  const month = (now ?? new Date()).getMonth();
   if (month >= 2 && month <= 4) return 'spring';
   if (month >= 5 && month <= 7) return 'summer';
   if (month >= 8 && month <= 10) return 'fall';
@@ -605,10 +606,11 @@ outfitSuggest.get('/today-context', zValidator('query', todayContextSchema), asy
     weather = await getWeather(query.lat, query.lon);
   }
 
-  // 2. Time-based context
-  const now = new Date();
-  const hour = now.getHours();
-  const dayOfWeek = now.getDay(); // 0=Sun, 6=Sat
+  // 2. Time-based context (offset to user's local timezone)
+  const tzOffset = query.tz_offset_minutes ?? 0;
+  const now = new Date(Date.now() - tzOffset * 60 * 1000);
+  const hour = now.getUTCHours();
+  const dayOfWeek = now.getUTCDay(); // 0=Sun, 6=Sat
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
   let timeOfDay: 'morning' | 'afternoon' | 'evening';

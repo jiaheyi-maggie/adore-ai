@@ -515,11 +515,13 @@ export interface TodayContext {
 
 export async function getTodayContext(
   lat?: number,
-  lon?: number
+  lon?: number,
+  tzOffsetMinutes?: number
 ): Promise<ApiResponse<TodayContext>> {
   const params = new URLSearchParams();
   if (lat != null) params.set('lat', String(lat));
   if (lon != null) params.set('lon', String(lon));
+  if (tzOffsetMinutes != null) params.set('tz_offset_minutes', String(tzOffsetMinutes));
   const qs = params.toString();
   return apiFetch<ApiResponse<TodayContext>>(
     `/outfits/today-context${qs ? `?${qs}` : ''}`

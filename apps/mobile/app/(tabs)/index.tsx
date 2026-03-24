@@ -170,6 +170,7 @@ export default function TodayScreen() {
     lon: number;
   } | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
 
   // Request location on mount
   useEffect(() => {
@@ -191,13 +192,14 @@ export default function TodayScreen() {
     })();
   }, []);
 
-  // Fetch today context
+  // Fetch today context (pass local timezone offset so server computes correct time-of-day)
   const {
     data: contextData,
     isLoading: contextLoading,
   } = useQuery({
     queryKey: ['today-context', location?.lat, location?.lon],
-    queryFn: () => getTodayContext(location?.lat, location?.lon),
+    queryFn: () =>
+      getTodayContext(location?.lat, location?.lon, new Date().getTimezoneOffset()),
     enabled: true,
     staleTime: 5 * 60 * 1000, // 5 min
   });
@@ -237,9 +239,11 @@ export default function TodayScreen() {
         notes: `Suggested outfit: ${outfit.name}`,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, outfit) => {
+      setLoggedIds((prev) => new Set(prev).add(outfit.id));
       queryClient.invalidateQueries({ queryKey: ['outfits'] });
       queryClient.invalidateQueries({ queryKey: ['wardrobe-items'] });
+      setTimeout(() => wearMutation.reset(), 3000);
     },
   });
 
@@ -434,8 +438,8 @@ export default function TodayScreen() {
                         outfit={item}
                         onWearIt={() => handleWearIt(item)}
                         isLogging={
-                          wearMutation.isPending &&
-                          wearMutation.variables?.id === item.id
+                          loggedIds.has(item.id) ||
+                          wearMutation.isPending
                         }
                       />
                     </View>

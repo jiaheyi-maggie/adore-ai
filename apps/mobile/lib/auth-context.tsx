@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from './api';
+import { queryClient } from './query-client';
 
 interface AuthState {
   user: SupabaseUser | null;
@@ -132,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    queryClient.clear();
     setState({
       user: null,
       session: null,
