@@ -639,6 +639,7 @@ export default function TodayScreen() {
             items: newItems,
             name: newName,
             happiness_estimate: Math.round(newHappiness * 10) / 10,
+            hero_item_id: swapItem.id === outfit.hero_item_id ? alt.id : outfit.hero_item_id,
           };
         })
       );

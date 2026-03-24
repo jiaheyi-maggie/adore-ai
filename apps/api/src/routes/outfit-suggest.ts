@@ -89,6 +89,20 @@ const todayContextSchema = z.object({
   tz_offset_minutes: z.coerce.number().min(-720).max(840).optional(),
 });
 
+// ── Daily-Seeded PRNG ─────────────────────────────────────────
+
+function dailySeededRandom(userId: string): () => number {
+  const dateStr = new Date().toISOString().split('T')[0];
+  let seed = 0;
+  for (const ch of userId + dateStr) {
+    seed = ((seed << 5) - seed + ch.charCodeAt(0)) | 0;
+  }
+  return () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
 // ── Color Harmony ─────────────────────────────────────────────
 
 const COLOR_FAMILIES: Record<string, string[]> = {
@@ -265,7 +279,7 @@ function getIntentWeights(intent: StylingIntent): ScoringWeights {
 const NEUTRAL_COLORS = new Set(['black', 'navy', 'cream', 'grey', 'gray', 'white', 'beige', 'charcoal', 'khaki', 'tan', 'taupe']);
 const COMFORT_MATERIALS = new Set(['cotton', 'knit', 'cashmere', 'linen']);
 
-function intentItemBonus(item: WardrobeItem, intent: StylingIntent, recentWornIds: Set<string>): number {
+function intentItemBonus(item: WardrobeItem, intent: StylingIntent, recentWornIds: Set<string>, rng: () => number = Math.random): number {
   let bonus = 0;
 
   switch (intent) {
@@ -298,7 +312,7 @@ function intentItemBonus(item: WardrobeItem, intent: StylingIntent, recentWornId
       if (item.times_worn <= 2) bonus += 0.2;
       if (!recentWornIds.has(item.id)) bonus += 0.1;
       // Random spice
-      bonus += Math.random() * 0.15;
+      bonus += rng() * 0.15;
       break;
   }
 
@@ -318,7 +332,8 @@ function scoreOutfitCombination(
   occasion: OccasionType | null,
   weather: WeatherContext | null,
   recentWornIds: Set<string>,
-  intent: StylingIntent = 'default'
+  intent: StylingIntent = 'default',
+  rng: () => number = Math.random
 ): number {
   if (items.length < 2) return 0;
 
@@ -385,7 +400,7 @@ function scoreOutfitCombination(
   }
 
   // 7. Intent item bonuses
-  const intentBonus = items.reduce((sum, item) => sum + intentItemBonus(item, intent, recentWornIds), 0) / items.length;
+  const intentBonus = items.reduce((sum, item) => sum + intentItemBonus(item, intent, recentWornIds, rng), 0) / items.length;
 
   // Composite score (weighted by intent)
   const composite =
@@ -406,8 +421,10 @@ function generateOutfits(
   weather: WeatherContext | null,
   recentWornIds: Set<string>,
   count: number,
-  intent: StylingIntent = 'default'
+  intent: StylingIntent = 'default',
+  userId: string = ''
 ): ScoredOutfit[] {
+  const rng = dailySeededRandom(userId);
   const season = getCurrentSeason();
 
   // Filter by season and active status
@@ -459,13 +476,13 @@ function generateOutfits(
     if (!recentWornIds.has(item.id)) s += 2;
     s += (item.versatility_score ?? 5) / 10;
     // Slight randomness for variety
-    s += Math.random() * 0.3;
+    s += rng() * 0.3;
 
     // Intent-specific hero selection
     if (intent === 'surprise-me') {
       // Prefer least-worn items as hero pieces
       s += Math.max(0, (5 - item.times_worn) / 5);
-      s += Math.random() * 0.5; // extra randomness
+      s += rng() * 0.5; // extra randomness
     } else if (intent === 'make-statement') {
       // Prefer bold-colored items as heroes
       if (item.colors.length > 0 && !NEUTRAL_COLORS.has(item.colors[0].toLowerCase())) s += 1;
@@ -491,7 +508,7 @@ function generateOutfits(
           colorHarmonyScore(heroItem.colors, c.colors) * 0.5 +
           (Math.abs(c.formality_level - heroItem.formality_level) <= 1 ? 0.3 : 0) +
           (!recentWornIds.has(c.id) ? 0.2 : 0) +
-          intentItemBonus(c, intent, recentWornIds),
+          intentItemBonus(c, intent, recentWornIds, rng),
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -563,7 +580,7 @@ function generateOutfits(
     }
 
     // Score the full combination
-    const score = scoreOutfitCombination(outfitItems, occasion, weather, recentWornIds, intent);
+    const score = scoreOutfitCombination(outfitItems, occasion, weather, recentWornIds, intent, rng);
 
     results.push({ items: outfitItems, score, hero_item_id: hero.id });
     usedHeroIds.add(hero.id);
@@ -709,7 +726,8 @@ outfitSuggest.post('/suggest', zValidator('json', suggestSchema), async (c) => {
     weather,
     recentWornIds,
     body.count,
-    body.intent
+    body.intent,
+    userId
   );
 
   if (outfits.length === 0) {
@@ -842,12 +860,14 @@ outfitSuggest.get('/today-context', zValidator('query', todayContextSchema), asy
 
 outfitSuggest.post('/suggest/swap', zValidator('json', swapSchema), async (c) => {
   const supabase = c.get('supabase');
+  const userId = c.get('userId');
   const body = c.req.valid('json');
 
   // 1. Fetch the kept items to compute compatibility against
   const { data: keptItems, error: keptError } = await supabase
     .from('wardrobe_items')
     .select('*')
+    .eq('user_id', userId)
     .in('id', body.keep_item_ids);
 
   if (keptError) {
@@ -869,6 +889,7 @@ outfitSuggest.post('/suggest/swap', zValidator('json', swapSchema), async (c) =>
   const { data: candidates, error: candidatesError } = await supabase
     .from('wardrobe_items')
     .select('*')
+    .eq('user_id', userId)
     .eq('category', body.replace_slot)
     .eq('status', 'active')
     .limit(200);
