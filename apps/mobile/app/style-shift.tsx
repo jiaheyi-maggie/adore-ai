@@ -15,8 +15,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { colors, fonts, spacing, radii } from '../../lib/theme';
-import WishlistButton from '../../components/WishlistButton';
+import { colors, fonts, spacing, radii } from '../lib/theme';
+import WishlistButton from '../components/WishlistButton';
 import {
   getStylePresets,
   createStyleShift,
@@ -29,7 +29,7 @@ import {
   type ShoppingListItem,
   type ClassifiedItem,
   type PhaseScheduleItem,
-} from '../../lib/api';
+} from '../lib/api';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -204,7 +204,7 @@ export default function StyleShiftScreen() {
   }, []);
 
   const handleTrackProgress = useCallback(() => {
-    router.navigate('/profile');
+    router.back();
   }, [router]);
 
   // ── Render Steps ────────────────────────────────────────────
@@ -225,7 +225,7 @@ export default function StyleShiftScreen() {
         <Pressable
           onPress={() => {
             if (step === 'choose-direction') {
-              router.navigate('/profile');
+              router.back();
             } else if (step === 'choose-intensity') {
               setStep('choose-direction');
             } else if (step === 'closet-reseen') {
@@ -235,7 +235,7 @@ export default function StyleShiftScreen() {
             } else if (step === 'shopping-list') {
               setStep('bridge-outfits');
             } else {
-              router.navigate('/profile');
+              router.back();
             }
           }}
           hitSlop={12}

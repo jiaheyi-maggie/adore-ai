@@ -27,8 +27,8 @@ import {
   getWeatherForLocation,
   type DecomposedItem,
   type CreateOutfitPayload,
-} from '../../lib/api';
-import { colors, fonts } from '../../lib/theme';
+} from '../lib/api';
+import { colors, fonts } from '../lib/theme';
 
 // ── Constants ─────────────────────────────────────────────────
 

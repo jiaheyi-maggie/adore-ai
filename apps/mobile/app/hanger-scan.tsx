@@ -24,8 +24,8 @@ import {
   rapidConfirm,
   type RapidScanItem,
   type RapidConfirmItem,
-} from '../../lib/api';
-import { colors, fonts, categoryColors } from '../../lib/theme';
+} from '../lib/api';
+import { colors, fonts, categoryColors } from '../lib/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
   Dimensions.get('window');

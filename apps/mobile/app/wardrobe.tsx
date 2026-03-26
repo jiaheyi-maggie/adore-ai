@@ -15,9 +15,9 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import type { WardrobeItem, PaginatedResponse } from '@adore/shared';
-import { listItems } from '../../lib/api';
-import ItemCard from '../../components/ItemCard';
-import { colors, fonts } from '../../lib/theme';
+import { listItems } from '../lib/api';
+import ItemCard from '../components/ItemCard';
+import { colors, fonts } from '../lib/theme';
 
 export default function WardrobeScreen() {
   const router = useRouter();

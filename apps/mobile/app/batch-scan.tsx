@@ -23,8 +23,8 @@ import {
   batchConfirm,
   type BatchScanItem,
   type BatchConfirmItem,
-} from '../../lib/api';
-import { colors, fonts, categoryColors } from '../../lib/theme';
+} from '../lib/api';
+import { colors, fonts, categoryColors } from '../lib/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 64;

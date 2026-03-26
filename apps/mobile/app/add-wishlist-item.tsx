@@ -25,11 +25,11 @@ import {
   getHappinessScore,
   searchWishlistProducts,
   type ScannedWishlistItem,
-} from '../../lib/api';
+} from '../lib/api';
 import type { ProductSearchResult } from '@adore/shared';
-import ProductCard from '../../components/ProductCard';
-import WishlistButton from '../../components/WishlistButton';
-import { colors, fonts, spacing, radii } from '../../lib/theme';
+import ProductCard from '../components/ProductCard';
+import WishlistButton from '../components/WishlistButton';
+import { colors, fonts, spacing, radii } from '../lib/theme';
 import type { HappinessScore } from '@adore/shared';
 
 type FlowStep = 'search' | 'pick' | 'processing' | 'review' | 'happiness-result';
