@@ -901,10 +901,18 @@ export interface CheckPurchasePayload {
   external_product_id?: string | null;
 }
 
+export interface PurchaseContext {
+  recent_similar_checks: Array<{ name: string; brand: string | null; checked_at: string }>;
+  dormant_similar_items: Array<{ name: string; brand: string | null; days_since_worn: number; times_worn: number }>;
+  budget: { percent_spent: number; days_remaining: number; this_purchase_pushes_to: number } | null;
+  style_shift: { goal_name: string; fills_gap: boolean; gap_category: string | null } | null;
+}
+
 export interface CheckPurchaseResponse {
   score: HappinessScore;
   item: WishlistItem;
   affiliate_url: string | null;
+  context: PurchaseContext;
 }
 
 export async function checkPurchase(

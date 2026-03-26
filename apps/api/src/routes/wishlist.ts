@@ -586,6 +586,121 @@ wishlist.post('/check', zValidator('json', checkPurchaseSchema), async (c) => {
     affiliateUrl = product?.affiliate_url ?? null;
   }
 
+  // ── Cross-Signal Context (enriched purchase intelligence) ──
+
+  // 1. Recent similar checks (wishlisted items in same category, last 7 days)
+  const recentSimilarChecks: Array<{ name: string; brand: string | null; checked_at: string }> = [];
+  if (body.category) {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const { data: recentItems } = await supabase
+      .from('wishlist_items')
+      .select('name, brand, created_at')
+      .eq('user_id', userId)
+      .eq('category', body.category)
+      .neq('id', insertedItem.id)
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (recentItems) {
+      for (const item of recentItems) {
+        recentSimilarChecks.push({
+          name: item.name,
+          brand: item.brand,
+          checked_at: item.created_at,
+        });
+      }
+    }
+  }
+
+  // 2. Dormant similar items (owned items in same category, unworn 45+ days)
+  const dormantSimilarItems: Array<{ name: string; brand: string | null; days_since_worn: number; times_worn: number }> = [];
+  if (body.category) {
+    const { data: ownedItems } = await supabase
+      .from('wardrobe_items')
+      .select('id, name, brand, times_worn, updated_at')
+      .eq('user_id', userId)
+      .eq('category', body.category)
+      .eq('status', 'active')
+      .order('times_worn', { ascending: true })
+      .limit(10);
+
+    if (ownedItems) {
+      const now = Date.now();
+      for (const item of ownedItems) {
+        const daysSince = Math.floor((now - new Date(item.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSince >= 45 || item.times_worn === 0) {
+          dormantSimilarItems.push({
+            name: item.name,
+            brand: item.brand,
+            days_since_worn: daysSince,
+            times_worn: item.times_worn ?? 0,
+          });
+        }
+      }
+    }
+  }
+
+  // 3. Budget position
+  let budgetContext: { percent_spent: number; days_remaining: number; this_purchase_pushes_to: number } | null = null;
+  {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: activeBudget } = await supabase
+      .from('budget_periods')
+      .select('*')
+      .eq('user_id', userId)
+      .lte('period_start', today)
+      .gte('period_end', today)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (activeBudget && activeBudget.budget_amount > 0) {
+      const spent = activeBudget.spent_amount ?? 0;
+      const pctBefore = Math.round((spent / activeBudget.budget_amount) * 100);
+      const pctAfter = body.price
+        ? Math.round(((spent + body.price) / activeBudget.budget_amount) * 100)
+        : pctBefore;
+      const endDate = new Date(activeBudget.period_end);
+      const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
+      budgetContext = {
+        percent_spent: pctBefore,
+        days_remaining: daysLeft,
+        this_purchase_pushes_to: pctAfter,
+      };
+    }
+  }
+
+  // 4. Style shift alignment
+  let styleShiftContext: { goal_name: string; fills_gap: boolean; gap_category: string | null } | null = null;
+  {
+    const { data: activeGoal } = await supabase
+      .from('style_goals')
+      .select('title, target_state')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .eq('goal_type', 'aesthetic-shift')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (activeGoal) {
+      const targetState = activeGoal.target_state as Record<string, unknown> | null;
+      const classification = targetState?.wardrobe_classification_summary as Record<string, number> | null;
+      // If the item's category is in the target's favored categories, it fills a gap
+      const fillsGap = body.category
+        ? (classification?.phase_out ?? 0) > 0 || similarCount === 0
+        : false;
+      styleShiftContext = {
+        goal_name: activeGoal.title,
+        fills_gap: fillsGap,
+        gap_category: fillsGap ? (body.category ?? null) : null,
+      };
+    }
+  }
+
   return c.json({
     data: {
       score,
@@ -595,6 +710,12 @@ wishlist.post('/check', zValidator('json', checkPurchaseSchema), async (c) => {
         versatility_impact: score.breakdown.versatility_score,
       },
       affiliate_url: affiliateUrl,
+      context: {
+        recent_similar_checks: recentSimilarChecks,
+        dormant_similar_items: dormantSimilarItems,
+        budget: budgetContext,
+        style_shift: styleShiftContext,
+      },
     },
     error: null,
   });
