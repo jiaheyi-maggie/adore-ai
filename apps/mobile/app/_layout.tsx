@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -19,7 +19,7 @@ import {
   DMMono_500Medium,
 } from '@expo-google-fonts/dm-mono';
 import { queryClient } from '../lib/query-client';
-import { colors } from '../lib/theme';
+import { colors, fonts } from '../lib/theme';
 import { AuthProvider, useAuth } from '../lib/auth-context';
 
 // Keep the splash screen visible while fonts load
@@ -62,7 +62,39 @@ function RootNavigator() {
     );
   }
 
-  return <Slot />;
+  return (
+    <Stack
+      initialRouteName="(tabs)"
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.background },
+        headerTitleStyle: {
+          fontFamily: fonts.cormorant.medium,
+          fontSize: 20,
+          fontWeight: '500',
+          color: colors.textPrimary,
+        },
+        headerShadowVisible: false,
+        headerTintColor: colors.accent,
+      }}
+    >
+      {/* Route groups — hide their headers (they manage their own) */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+
+      {/* Detail screens — pushed on root Stack OVER tabs */}
+      <Stack.Screen name="wardrobe" options={{ title: 'Wardrobe' }} />
+      <Stack.Screen name="add-item" options={{ title: 'Add Item' }} />
+      <Stack.Screen name="log-outfit" options={{ title: 'Log Outfit' }} />
+      <Stack.Screen name="sell-item" options={{ title: 'Sell Item' }} />
+      <Stack.Screen name="my-listings" options={{ title: 'My Listings' }} />
+      <Stack.Screen name="add-wishlist-item" options={{ title: 'Add to Wishlist' }} />
+      <Stack.Screen name="batch-scan" options={{ title: 'Batch Scan' }} />
+      <Stack.Screen name="hanger-scan" options={{ title: 'Closet Scan' }} />
+      <Stack.Screen name="style-shift" options={{ title: 'Style Shifting', headerShown: false }} />
+      <Stack.Screen name="check-purchase" options={{ title: 'Check a Purchase' }} />
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
