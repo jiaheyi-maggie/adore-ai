@@ -7,12 +7,28 @@ export type { ProductSearchResult };
 interface SerperShoppingResponse {
   shopping?: Array<{
     title: string;
-    price: number;
+    price: number | string;
     currency?: string;
     link: string;
     imageUrl?: string;
     source: string;
   }>;
+}
+
+/**
+ * Parse a price value from Serper API.
+ * Serper returns price as a number for some products and a string like "$425.00"
+ * or "425.00 USD" for others. This normalizes both to a numeric value.
+ * Returns null if the value cannot be parsed as a valid price.
+ */
+function parsePrice(raw: number | string | null | undefined): number | null {
+  if (raw == null) return null;
+  if (typeof raw === 'number') return isFinite(raw) ? raw : null;
+  // Strip currency symbols, commas, and whitespace: "$1,425.00 USD" → "1425.00"
+  const cleaned = raw.replace(/[^0-9.]/g, '');
+  if (!cleaned) return null;
+  const parsed = Number(cleaned);
+  return isFinite(parsed) ? parsed : null;
 }
 
 // ── Query Builder ────────────────────────────────────────────
@@ -109,9 +125,9 @@ export async function searchProduct(
       return [];
     }
 
-    return data.shopping.map((item) => ({
+    return data.shopping.slice(0, MAX_RESULTS).map((item) => ({
       name: item.title,
-      price: item.price,
+      price: parsePrice(item.price) ?? 0,
       currency: item.currency ?? 'USD',
       source_url: item.link,
       image_url: item.imageUrl ?? '',
@@ -160,38 +176,49 @@ export async function storeProductMatches(
     },
   }));
 
-  const ids: (string | null)[] = [];
+  // Batch lookup: find which source_urls already exist (single query)
+  const sourceUrls = records.map((r) => r.source_url);
+  const { data: existingRows } = await adminClient
+    .from('external_products')
+    .select('id, source_url')
+    .in('source_url', sourceUrls);
 
-  // Insert one by one to handle source_url uniqueness gracefully.
-  // external_products doesn't have a unique constraint on source_url in the schema,
-  // so we check for existence first.
-  for (const record of records) {
-    // Check if this source_url already exists
-    const { data: existing } = await adminClient
-      .from('external_products')
-      .select('id')
-      .eq('source_url', record.source_url)
-      .limit(1)
-      .single();
+  const existingByUrl = new Map(
+    (existingRows ?? []).map((row) => [row.source_url, row.id as string])
+  );
 
-    if (existing) {
-      ids.push(existing.id);
-      continue;
+  // Split into existing (already have IDs) and new (need insert)
+  const ids: (string | null)[] = new Array(records.length).fill(null);
+  const toInsert: { index: number; record: (typeof records)[number] }[] = [];
+
+  for (let i = 0; i < records.length; i++) {
+    const existingId = existingByUrl.get(records[i].source_url);
+    if (existingId) {
+      ids[i] = existingId;
+    } else {
+      toInsert.push({ index: i, record: records[i] });
     }
+  }
 
+  // Batch insert all new records in a single query
+  if (toInsert.length > 0) {
     const { data: inserted, error } = await adminClient
       .from('external_products')
-      .insert(record)
-      .select('id')
-      .single();
+      .insert(toInsert.map((t) => t.record))
+      .select('id, source_url');
 
     if (error) {
-      console.error('[product-search] Failed to store product:', error.message);
-      ids.push(null);
-      continue;
+      console.error('[product-search] Failed to store products:', error.message);
+      // All new inserts failed — ids stay null for those positions
+    } else if (inserted) {
+      // Map inserted rows back to their original positions
+      const insertedByUrl = new Map(
+        inserted.map((row) => [row.source_url, row.id as string])
+      );
+      for (const { index, record } of toInsert) {
+        ids[index] = insertedByUrl.get(record.source_url) ?? null;
+      }
     }
-
-    ids.push(inserted?.id ?? null);
   }
 
   return ids;
