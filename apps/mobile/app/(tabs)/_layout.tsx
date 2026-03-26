@@ -134,6 +134,13 @@ export default function TabsLayout() {
           title: 'Style Shifting',
         }}
       />
+      <Tabs.Screen
+        name="check-purchase"
+        options={{
+          href: null,
+          title: 'Check a Purchase',
+        }}
+      />
     </Tabs>
   );
 }

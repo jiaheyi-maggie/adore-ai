@@ -235,6 +235,11 @@ export default function ProfileScreen() {
           badge="Style Shifting"
           onPress={() => router.push('/style-shift')}
         />
+        <MenuItem
+          icon="shield-checkmark-outline"
+          label="Check a Purchase"
+          onPress={() => router.push('/check-purchase')}
+        />
         <MenuItem icon="wallet-outline" label="Budget" badge="Not set" />
         <MenuItem icon="flag-outline" label="Style Goals" badge="0 active" />
         <MenuItem icon="stats-chart-outline" label="Wardrobe Analytics" />

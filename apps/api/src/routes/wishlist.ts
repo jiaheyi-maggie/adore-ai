@@ -81,6 +81,16 @@ const searchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(10).default(5),
 });
 
+const checkPurchaseSchema = z.object({
+  name: z.string().min(1).max(300),
+  price: z.number().min(0).nullable().optional(),
+  brand: z.string().max(200).nullable().optional(),
+  category: z.enum(ITEM_CATEGORIES).nullable().optional(),
+  source_url: z.string().url().nullable().optional(),
+  image_url: z.string().url().nullable().optional(),
+  external_product_id: z.string().uuid().nullable().optional(),
+});
+
 const createBudgetSchema = z.object({
   budget_amount: z.number().min(0),
   period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
@@ -476,6 +486,116 @@ wishlist.post('/search', zValidator('json', searchSchema), async (c) => {
 
   return c.json({
     data: { query, results: enriched },
+    error: null,
+  });
+});
+
+// ── POST /wishlist/check — Check a purchase (anti-return) ─────
+
+wishlist.post('/check', zValidator('json', checkPurchaseSchema), async (c) => {
+  const supabase = c.get('supabase');
+  const userId = c.get('userId');
+  const body = c.req.valid('json');
+
+  // Auto-detect similar owned items
+  const similarCount = await countSimilarOwned(
+    supabase,
+    userId,
+    (body.category as ItemCategory) ?? null,
+    body.brand ?? null
+  );
+
+  // Insert into wishlist_items with priority 'want' and status 'active'
+  const { data: insertedItem, error: insertError } = await supabase
+    .from('wishlist_items')
+    .insert({
+      user_id: userId,
+      name: body.name,
+      image_url: body.image_url ?? null,
+      source_url: body.source_url ?? null,
+      price: body.price ?? null,
+      brand: body.brand ?? null,
+      category: body.category ?? null,
+      priority: 'want',
+      status: 'active',
+      external_product_id: body.external_product_id ?? null,
+      similar_owned_count: similarCount,
+    })
+    .select()
+    .single();
+
+  if (insertError || !insertedItem) {
+    return c.json(
+      { data: null, error: { code: 'INSERT_FAILED', message: insertError?.message ?? 'Failed to create item' } },
+      400
+    );
+  }
+
+  // Emit 'wishlisted' PreferenceSignal (append-only)
+  const { error: signalError } = await supabase.from('preference_signals').insert({
+    user_id: userId,
+    signal_type: 'wishlisted',
+    value: {
+      wishlist_item_id: insertedItem.id,
+      name: body.name,
+      brand: body.brand ?? null,
+      category: body.category ?? null,
+      price: body.price ?? null,
+      priority: 'want',
+      similar_owned_count: similarCount,
+    },
+  });
+
+  if (signalError) {
+    console.error('Failed to emit wishlisted preference signal:', signalError.message);
+  }
+
+  // Calculate happiness score (cleanup item on failure)
+  let score;
+  try {
+    score = await calculateHappinessScore(supabase, userId, insertedItem);
+  } catch (err) {
+    // Clean up the orphaned item so retries don't create duplicates
+    await supabase.from('wishlist_items').delete().eq('id', insertedItem.id);
+    const message = err instanceof Error ? err.message : 'Failed to analyze purchase';
+    console.error('[wishlist-check] Score calculation failed:', message);
+    return c.json(
+      { data: null, error: { code: 'SCORE_FAILED', message } },
+      502,
+    );
+  }
+
+  // Persist happiness_score_prediction and versatility_impact back to the item
+  await supabase
+    .from('wishlist_items')
+    .update({
+      happiness_score_prediction: score.overall,
+      versatility_impact: score.breakdown.versatility_score,
+    })
+    .eq('id', insertedItem.id);
+
+  // If external_product_id provided, fetch affiliate_url from external_products
+  let affiliateUrl: string | null = null;
+  if (body.external_product_id) {
+    const { data: product } = await supabase
+      .from('external_products')
+      .select('affiliate_url')
+      .eq('id', body.external_product_id)
+      .single();
+
+    affiliateUrl = product?.affiliate_url ?? null;
+  }
+
+  return c.json({
+    data: {
+      score,
+      item: {
+        ...insertedItem,
+        happiness_score_prediction: score.overall,
+        versatility_impact: score.breakdown.versatility_score,
+      },
+      affiliate_url: affiliateUrl,
+    },
     error: null,
   });
 });

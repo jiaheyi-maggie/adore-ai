@@ -639,6 +639,7 @@ export async function countSimilarOwned(
   let query = supabase
     .from('wardrobe_items')
     .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
     .eq('category', category)
     .neq('status', 'archived')
     .neq('status', 'sold');

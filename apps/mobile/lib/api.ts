@@ -889,6 +889,33 @@ export async function searchWishlistProducts(
   });
 }
 
+// ── Check a Purchase (Anti-Return) ────────────────────────────
+
+export interface CheckPurchasePayload {
+  name: string;
+  price?: number | null;
+  brand?: string | null;
+  category?: ItemCategory | null;
+  source_url?: string | null;
+  image_url?: string | null;
+  external_product_id?: string | null;
+}
+
+export interface CheckPurchaseResponse {
+  score: HappinessScore;
+  item: WishlistItem;
+  affiliate_url: string | null;
+}
+
+export async function checkPurchase(
+  data: CheckPurchasePayload
+): Promise<ApiResponse<CheckPurchaseResponse>> {
+  return apiFetch<ApiResponse<CheckPurchaseResponse>>('/wishlist/check', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 // ── Budget API ────────────────────────────────────────────────
 
 export interface BudgetCurrentResponse extends BudgetPeriod {

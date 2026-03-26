@@ -644,26 +644,28 @@ export default function WishlistScreen() {
           <Ionicons name="heart-outline" size={64} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>Your wish list is empty</Text>
           <Text style={styles.emptySubtitle}>
-            Screenshot something you want to buy, and Adore will tell you if
-            it's worth it based on your wardrobe and budget.
+            Search for products you're considering, and Adore will tell you if
+            they're worth buying based on your wardrobe and budget.
           </Text>
 
           <Pressable
             style={styles.addButton}
             onPress={() => router.push('/add-wishlist-item')}
           >
-            <Ionicons name="camera-outline" size={20} color="#fff" />
-            <Text style={styles.addText}>Add from Screenshot</Text>
+            <Ionicons name="search" size={20} color="#fff" />
+            <Text style={styles.addText}>Search & Add</Text>
           </Pressable>
 
           <Pressable
             style={styles.addButtonSecondary}
-            onPress={() =>
-              router.push({ pathname: '/add-wishlist-item', params: { mode: 'manual' } })
-            }
+            onPress={() => router.push('/add-wishlist-item')}
           >
-            <Ionicons name="add" size={20} color={colors.accent} />
-            <Text style={styles.addTextSecondary}>Add Manually</Text>
+            <Ionicons name="camera-outline" size={20} color={colors.accent} />
+            <Text style={styles.addTextSecondary}>Add from Screenshot</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/check-purchase')}>
+            <Text style={styles.checkLinkText}>or check a purchase first</Text>
           </Pressable>
         </View>
 
@@ -686,6 +688,16 @@ export default function WishlistScreen() {
         budget={budget}
         onSetBudget={() => setShowBudgetModal(true)}
       />
+
+      {/* Check before you buy */}
+      <Pressable
+        style={styles.checkPrompt}
+        onPress={() => router.push('/check-purchase')}
+      >
+        <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
+        <Text style={styles.checkPromptText}>Check before you buy</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Pressable>
 
       {/* Filter tabs */}
       <View style={styles.filterRow}>
@@ -1150,6 +1162,30 @@ const styles = StyleSheet.create({
     fontFamily: fonts.inter.medium,
     color: colors.accent,
     fontSize: 16,
+  },
+  checkPrompt: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  checkPromptText: {
+    flex: 1,
+    fontFamily: fonts.inter.medium,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  checkLinkText: {
+    fontFamily: fonts.inter.medium,
+    fontSize: 14,
+    color: colors.accent,
+    marginTop: spacing.sm,
   },
   emptyFilter: {
     paddingVertical: 60,
