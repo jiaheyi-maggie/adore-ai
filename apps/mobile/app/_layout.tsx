@@ -75,6 +75,7 @@ function RootNavigator() {
         },
         headerShadowVisible: false,
         headerTintColor: colors.accent,
+        headerBackTitle: '',
       }}
     >
       {/* Route groups — hide their headers (they manage their own) */}
